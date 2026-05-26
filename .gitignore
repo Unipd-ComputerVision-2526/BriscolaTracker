@@ -44,6 +44,9 @@ build/
 Build/
 build-*/
 
+# Dataset directories
+dataset/
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
