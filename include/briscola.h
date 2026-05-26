@@ -15,7 +15,7 @@ class Briscola{
         Briscola(Seme seme, int players=2);
 
         void addCardToRound(Seme seme, int number);
-        std::vector<int> getScore();
+        std::vector<int> getScores();
 
     private:
         int players;
