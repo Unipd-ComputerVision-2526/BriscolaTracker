@@ -1,103 +1,49 @@
-#include <opencv2/opencv.hpp>
-#include <opencv2/features2d.hpp>
 #include <iostream>
 #include <vector>
-#include <string>
-#include <filesystem>
-
-namespace fs = std::filesystem;
-using namespace cv;
-using namespace std;
-
-// Struttura per memorizzare i dati di ogni carta template
-struct CardTemplate {
-    string name;
-    Mat descriptors;
-    vector<KeyPoint> keypoints;
-};
+#include <tuple>
+#include <opencv2/opencv.hpp>
+#include "utils.h"
 
 int main() {
-    // 1. Inizializza il detector SIFT
-    Ptr<SIFT> sift = SIFT::create();
-    
-    // 2. Carica e calcola keypoints/descriptors per le 40 carte del dataset
-    vector<CardTemplate> deck;
-    string datasetPath = "dataset/Briscola_Trentine";
-    
-    cout << "Caricamento dataset carte da: " << datasetPath << "..." << endl;
-    for (const auto& entry : fs::directory_iterator(datasetPath)) {
-        if (entry.path().extension() == ".JPG" || entry.path().extension() == ".jpg") {
-            Mat img = imread(entry.path().string(), IMREAD_GRAYSCALE);
-            if (img.empty()) continue;
+    // 1. Test Caricamento Dataset (Gia' verificato)
+    std::string datasetPath = "dataset/Briscola_Trentine";
+    std::vector<std::tuple<cv::Mat, Seme, int>> dataset = loadDataset(datasetPath);
+    std::cout << "Dataset caricato: " << dataset.size() << " carte." << std::endl;
 
-            CardTemplate card;
-            card.name = entry.path().filename().string();
-            sift->detectAndCompute(img, noArray(), card.keypoints, card.descriptors);
-            deck.push_back(card);
-        }
+    // 2. Test VideoFrameManager
+    // Proviamo con il primo round del game 1
+    std::string videoPath = "dataset/game1/game1round1.mp4";
+    std::cout << "\nTest: Analisi video " << videoPath << std::endl;
+
+    // Impostiamo un salto di 15 frame e una soglia di 10.0 (piu' alta = meno frame)
+    VideoFrameManager vfm(videoPath, 15, 10.0);
+
+    if (!vfm.isOpened()) {
+        return -1;
     }
-    cout << "Caricate " << deck.size() << " carte nel dataset." << endl;
 
-    // Inizializza il matcher (FLANN è ottimo per i descrittori SIFT che sono float)
-    FlannBasedMatcher matcher;
+    // Creo una finestra ridimensionabile per vedere tutto il video
+    cv::namedWindow("Frame Interessante", cv::WINDOW_NORMAL);
+    cv::resizeWindow("Frame Interessante", 800, 600);
 
-    // 3. Analizza i 4 game
-    for (int i = 1; i <= 4; ++i) {
-        string videoPath = "dataset/game" + to_string(i) + "/game" + to_string(i) + "round1.mp4";
-        VideoCapture cap(videoPath);
+    cv::Mat interestingFrame;
+    int count = 0;
+    
+    // In un progetto reale qui chiameremmo Occhi::recognize(interestingFrame)
+    while (vfm.getNextInterestingFrame(interestingFrame)) {
+        count++;
+        std::cout << "Trovato frame interessante numero: " << count << std::endl;
         
-        if (!cap.isOpened()) {
-            cerr << "Errore: Impossibile aprire il video " << videoPath << endl;
-            continue;
-        }
-
-        Mat frame;
-        cap >> frame; // Legge il primo frame
-        if (frame.empty()) {
-            cerr << "Errore: Frame vuoto in " << videoPath << endl;
-            continue;
-        }
-
-        cout << "\nAnalisi Game " << i << " (" << videoPath << ")..." << endl;
-
-        // Converti il frame in scala di grigi per l'estrazione delle feature
-        Mat grayFrame;
-        cvtColor(frame, grayFrame, COLOR_BGR2GRAY);
-
-        vector<KeyPoint> frameKeypoints;
-        Mat frameDescriptors;
-        sift->detectAndCompute(grayFrame, noArray(), frameKeypoints, frameDescriptors);
-
-        string bestCardName = "Nessuna";
-        int maxGoodMatches = 0;
-
-        // 4. Confronta il frame con ogni carta del mazzo
-        for (const auto& card : deck) {
-            vector<vector<DMatch>> knnMatches;
-            if (card.descriptors.empty() || frameDescriptors.empty()) continue;
-            
-            // Trova le 2 migliori corrispondenze per ogni feature
-            matcher.knnMatch(card.descriptors, frameDescriptors, knnMatches, 2);
-
-            // 5. Applica il Lowe's Ratio Test per filtrare i falsi positivi
-            const float ratio_thresh = 0.75f;
-            int goodMatchesCount = 0;
-            for (size_t j = 0; j < knnMatches.size(); j++) {
-                if (knnMatches[j][0].distance < ratio_thresh * knnMatches[j][1].distance) {
-                    goodMatchesCount++;
-                }
-            }
-
-            // Aggiorna la carta con il maggior numero di corrispondenze
-            if (goodMatchesCount > maxGoodMatches) {
-                maxGoodMatches = goodMatchesCount;
-                bestCardName = card.name;
-            }
-        }
-
-        cout << "-> Briscola rilevata: " << bestCardName 
-             << " (Match validi: " << maxGoodMatches << ")" << endl;
+        // Per visualizzare (opzionale, utile per debug)
+        cv::imshow("Frame Interessante", interestingFrame);
+        
+        // Aspetta 500ms tra un frame e l'altro per permetterci di vederli
+        // Premere un tasto per andare al prossimo o aspettare
+        if (cv::waitKey(500) == 27) break; // ESC per uscire
     }
+
+    std::cout << "Totale frame estratti per questo round: " << count << std::endl;
+    std::cout << "Fine test video." << std::endl;
 
     return 0;
 }
