@@ -37,7 +37,7 @@ class Briscola{
         int players;
         // Index of the player who will play first in the next round (0-based index).
         int nextFirstPlayer;
-        // Seed of the briscola for the game, which determines the trump suit.
+        // Seed of the briscola for the game, which determines the Briscola (trump suit).
         Suit briscolaSeed;
         // Cards played in the current round, with suit and number.
         std::vector<std::pair<Suit, int>> currentRoundCards;

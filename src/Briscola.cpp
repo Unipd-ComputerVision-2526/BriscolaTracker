@@ -2,6 +2,9 @@
 #include <stdexcept>
 #include <algorithm>
 
+//TO DO: serve FARE UNa tradzuione di numero -- carta??
+
+
 //returns the rank of the card for comparison purposes (higher = stronger card)
 //ranking: 1 > 3 > 10 > 9 > 8 > 7 > 6 > 5 > 4 > 2
 static int cardRank(int number) {
@@ -17,7 +20,7 @@ static int cardRank(int number) {
         case 4:  return 2;
         case 2:  return 1;
         default:
-            throw std::invalid_argument("Numero carta non valido: " + std::to_string(number));
+            throw std::invalid_argument("Card number not valid: " + std::to_string(number));
     }
 }
  
@@ -42,7 +45,6 @@ Briscola::Briscola(Suit suit, int players)
     //TO DO: resize o assign?? perchè uno mantiene i punteggi per tutta la partita, non solo per il round corrente
     scores.resize(players, 0);
 
-    //
     if(players != 2) {
         throw std::invalid_argument("Number of players must be between 2");
     }
@@ -55,7 +57,7 @@ bool Briscola::addCardToRound(Suit suit, int number) {
     cardRank(number); // validate card number, will throw if invalid
  
     if (isRoundComplete())
-        throw std::logic_error("Il round è già completo. Chiamare computeRound() prima di aggiungere nuove carte.");
+        throw std::logic_error("Round is not complete. Call computeRound() before adding new cards.");
  
     currentRoundCards.push_back({suit, number});
  
@@ -65,7 +67,6 @@ bool Briscola::addCardToRound(Suit suit, int number) {
     }
     return false;
 }
-
 
 std::vector<int> Briscola::getScores() {
     return scores;
@@ -89,43 +90,56 @@ bool Briscola::isRoundComplete() const {
 
 int Briscola::computeRound() {
     if (!isRoundComplete())
-        throw std::logic_error("Round non ancora completo.");
+        throw std::logic_error("Round is not complete.");
+
+    // Determine the playing order for this round, starting from nextFirstPlayer
+    //playOrder[0] = nextFirstPlayer, playOrder[1] = (nextFirstPlayer + 1) % players, etc.
+    std::vector<int> playOrder(players);
+    for (int i = 0; i < players; ++i)
+        playOrder[i] = (nextFirstPlayer + i) % players;
  
-    // La prima carta giocata determina il seme "dominante" (seme di apertura).
-    // nextFirstPlayer indica chi ha aperto: la sua carta è in posizione 0,
-    // le altre seguono nell'ordine di gioco.
+    // The first card played determines the "dominant" suit (opening suit).
+    // nextFirstPlayer indicates who opened: their card is in position 0,
+    // the others follow in playing order.
     Suit leadSuit = currentRoundCards[0].first;
  
-    // ── Calcolo del vincitore ──────────────────────────────────────────────
-    // Regola 1: se una carta è briscola batte qualsiasi carta non-briscola.
-    // Regola 2: se entrambe (o nessuna) sono briscola, o entrambe hanno lo
-    //           stesso seme dell'apertura, vince quella con rango più alto.
-    // Regola 3: se la carta di risposta ha seme diverso dall'apertura
-    //           (e nessuna è briscola), vince la carta di apertura.
- 
-    int winnerLocalIdx = 0;   // indice locale in currentRoundCards
+    // ── Computing the winner ──────────────────────────────────────────────
+    // Rule 1: if a card is briscola it beats any non-briscola card.
+    // Rule 2: if both (or neither) are briscola, or both have the
+    //           same suit as the opening, the one with the higher rank wins.
+    // Rule 3: if the response card has a different suit from the opening
+    //           (and neither is briscola), the opening card wins.
+
+    // We assume that the first player (playOrder[0]) is the winner until we find a challenger that beats him.
+    int globalWinner = playOrder[0];
+    int winnerCardIdx = 0; //index of the winning card in currentRoundCards
  
     for (int i = 1; i < players; ++i) {
         const std::pair<Suit, int>& challenger = currentRoundCards[i]; //challenger's card
-        const std::pair<Suit, int>& current    = currentRoundCards[winnerLocalIdx]; //current winning card
- 
+        const std::pair<Suit, int>& current    = currentRoundCards[winnerCardIdx]; //current winning card
+
         bool challengerIsBriscola = (challenger.first == briscolaSeed);
         bool currentIsBriscola    = (current.first    == briscolaSeed);
- 
+
         if (challengerIsBriscola && !currentIsBriscola) {
             // next player's card is briscola, current winning card is not → next player takes the lead
-            winnerLocalIdx = i;
+            globalWinner  = playOrder[i];
+            winnerCardIdx = i;
         } else if (!challengerIsBriscola && currentIsBriscola) { // challenger's card is not briscola, current winning card is → current player keeps the lead
-            // Il detentore è briscola, lo sfidante no → il detentore mantiene
+            // winnerCardIdx stays the same
         } else if (challengerIsBriscola && currentIsBriscola) { //both are briscola, compare rank
-            if (cardRank(challenger.second) > cardRank(current.second))
-                winnerLocalIdx = i;
+            if (cardRank(challenger.second) > cardRank(current.second)) {
+                globalWinner  = playOrder[i];
+                winnerCardIdx = i;
+            }
         } else { //none is briscola
             if (challenger.first == leadSuit) {
-                if (cardRank(challenger.second) > cardRank(current.second)) //challenger has same suit as lead and higher rank → challenger takes the lead
-                    winnerLocalIdx = i;
+                if (cardRank(challenger.second) > cardRank(current.second)) { //challenger has same suit as lead and higher rank → challenger takes the lead
+                    globalWinner  = playOrder[i];
+                    winnerCardIdx = i;
+                }
             }
-                //challenger has different suit from lead → current winning card keeps the lead
+            //challenger has different suit from lead → current winning card keeps the lead
         }
     }
  
@@ -133,9 +147,6 @@ int Briscola::computeRound() {
     int roundPoints = 0;
     for (const std::pair<Suit, int>& card : currentRoundCards)
         roundPoints += cardPoints(card.second);
- 
-    // update global scores: the winner of the round is the player who will start the next round, so we update his score
-    int globalWinner = (nextFirstPlayer + winnerLocalIdx) % players;
  
     std::vector<int> newScores = scores;
     newScores[globalWinner] += roundPoints;
@@ -146,5 +157,6 @@ int Briscola::computeRound() {
     currentRoundCards.clear();
  
     return globalWinner;
+
 }
 
