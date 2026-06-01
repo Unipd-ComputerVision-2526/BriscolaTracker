@@ -47,6 +47,9 @@ build-*/
 # Dataset directories
 dataset/
 
+# VSCODE directories
+/.vscode
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt

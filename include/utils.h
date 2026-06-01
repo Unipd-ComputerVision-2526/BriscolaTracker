@@ -9,7 +9,7 @@
 
 namespace fs = std::filesystem;
 
-enum Seme{
+enum Suit{
     COINS=1,
     CUPS=2,
     SWORDS=3,
@@ -54,3 +54,4 @@ private:
 };
 
 #endif
+
