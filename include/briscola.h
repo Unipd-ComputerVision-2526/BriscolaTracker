@@ -1,7 +1,7 @@
 #ifndef BRISCOLA_H
 #define BRISCOLA_H
 
-#include<vector>
+#include <vector>
 #include "utils.h"
 
 
