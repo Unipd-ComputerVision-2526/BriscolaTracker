@@ -3,11 +3,12 @@
 #include <tuple>
 #include <opencv2/opencv.hpp>
 #include "utils.h"
+#include "video_manager.h"
 
 int main() {
     // 1. Test Caricamento Dataset (Gia' verificato)
     std::string datasetPath = "dataset/Briscola_Trentine";
-    std::vector<std::tuple<cv::Mat, Seme, int>> dataset = loadDataset(datasetPath);
+    std::vector<std::tuple<cv::Mat, Suit, int>> dataset = loadDataset(datasetPath);
     std::cout << "Dataset caricato: " << dataset.size() << " carte." << std::endl;
 
     // 2. Test VideoFrameManager

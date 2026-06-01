@@ -28,30 +28,4 @@ bool parseFileName(const std::string& filename, int& numero, Suit& seme);
 // Legge tutte le immagini delle carte dal percorso specificato.
 std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datasetPath);
 
-class VideoFrameManager {
-public:
-    // Costruttore: apre il video e imposta i parametri di salto frame e soglia movimento
-    // motionThreshold: indica quanta differenza deve esserci tra i frame per considerarli diversi (5.0 è un buon punto di partenza)
-    VideoFrameManager(const std::string& videoPath, int frameSkip = 10, double motionThreshold = 5.0);
-    
-    // Distruttore: rilascia le risorse del video
-    ~VideoFrameManager();
-
-    // Ritorna true se il video è aperto correttamente
-    bool isOpened() const;
-
-    // Riempie 'frame' con il prossimo frame significativo e ritorna false quando il video termina.
-    bool getNextInterestingFrame(cv::Mat& frame);
-
-private:
-    cv::VideoCapture cap;
-    cv::Mat lastInterestingFrameGray;
-    int skip;
-    double threshold;
-    
-    // Funzione interna per calcolare la differenza tra due frame (SAD)
-    double calculateFrameDifference(const cv::Mat& current, const cv::Mat& last);
-};
-
 #endif
-
