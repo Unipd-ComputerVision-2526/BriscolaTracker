@@ -3,6 +3,7 @@
 #include <tuple>
 #include <opencv2/opencv.hpp>
 #include <utils.h>
+#include <video_manager.h>
 #include <eye.h>
 
 int main() {
