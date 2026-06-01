@@ -26,10 +26,14 @@ class Eye
         std::map<std::pair<Suit, int>, std::vector<cv::KeyPoint>> cardMap_;
         // Already recognized cards
         std::vector<std::pair<Suit, int>> recognizedCards_;
+        // Last used mask
+        cv::Mat lastMask_;
 
         bool isValidImage(const cv::Mat& img);
         bool validModelState();
 
+        void findCardPosition(const cv::Mat& img, cv::Mat& mask);
+        void findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
         void recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card);
         void recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card);
 };
