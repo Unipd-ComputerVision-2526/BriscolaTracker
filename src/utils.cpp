@@ -12,19 +12,19 @@ bool isValidImageFile(const fs::directory_entry& entry) {
     return (ext == ".JPG" || ext == ".jpg");
 }
 
-// Converte una stringa nel corrispondente enum Seme
-Seme stringToSeme(const std::string& semeStr) {
+// Converte una stringa nel corrispondente enum Suit
+Suit stringToSuit(const std::string& semeStr) {
     if (semeStr == "coins") return COINS;
     if (semeStr == "cups") return CUPS;
     if (semeStr == "swords" || semeStr == "spades") return SWORDS;
     if (semeStr == "clubs") return CLUBS;
     
-    std::cerr << "Errore: Seme sconosciuto '" << semeStr << "'. Fallback a COINS." << std::endl;
+    std::cerr << "Errore: Suit sconosciuto '" << semeStr << "'. Fallback a COINS." << std::endl;
     return COINS;
 }
 
-// Estrae Numero e Seme dal nome del file (es: "10-clubs.JPG")
-bool parseFileName(const std::string& filename, int& numero, Seme& seme) {
+// Estrae Numero e Suit dal nome del file (es: "10-clubs.JPG")
+bool parseFileName(const std::string& filename, int& numero, Suit& seme) {
     size_t posDash = filename.find('-'); //posizione del trattino
     size_t posDot = filename.find('.'); //posizione del punto dell'estensione 
     
@@ -37,7 +37,7 @@ bool parseFileName(const std::string& filename, int& numero, Seme& seme) {
         std::string semeStr = filename.substr(posDash + 1, posDot - posDash - 1); //estrai la parte del seme tra il trattino e il punto
         
         numero = std::stoi(numStr); //converte la stringa del numero in un intero.
-        seme = stringToSeme(semeStr); //converte la stringa del seme in un enum Seme.
+        seme = stringToSuit(semeStr); //converte la stringa del seme in un enum Suit.
         return true;
     } catch (const std::exception& e) {
         return false;
@@ -45,8 +45,8 @@ bool parseFileName(const std::string& filename, int& numero, Seme& seme) {
 }
 
 // Legge tutte le immagini delle carte dal percorso specificato.
-std::vector<std::tuple<cv::Mat, Seme, int>> loadDataset(const std::string& datasetPath) {
-    std::vector<std::tuple<cv::Mat, Seme, int>> dataset;
+std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datasetPath) {
+    std::vector<std::tuple<cv::Mat, Suit, int>> dataset;
     
     if (!fs::exists(datasetPath)) {
         std::cerr << "Errore: Cartella dataset non trovata: " << datasetPath << std::endl;
@@ -60,7 +60,7 @@ std::vector<std::tuple<cv::Mat, Seme, int>> loadDataset(const std::string& datas
         }
 
         int numero = 0;
-        Seme seme = COINS;
+        Suit seme = COINS;
         std::string filename = entry.path().filename().string();
 
         if (parseFileName(filename, numero, seme)) {

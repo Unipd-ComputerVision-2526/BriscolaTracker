@@ -20,13 +20,13 @@ enum Suit{
 bool isValidImageFile(const fs::directory_entry& entry);
 
 // Converte una stringa (es. "clubs") nel corrispondente enum Seme
-Seme stringToSeme(const std::string& semeStr);
+Suit stringToSuit(const std::string& semeStr);
 
 // Estrae Numero e Seme dal nome del file (es: "10-clubs.JPG") e ritorna false se il formato non è corretto.
-bool parseFileName(const std::string& filename, int& numero, Seme& seme);
+bool parseFileName(const std::string& filename, int& numero, Suit& seme);
 
 // Legge tutte le immagini delle carte dal percorso specificato.
-std::vector<std::tuple<cv::Mat, Seme, int>> loadDataset(const std::string& datasetPath);
+std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datasetPath);
 
 class VideoFrameManager {
 public:
