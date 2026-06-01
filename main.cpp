@@ -36,9 +36,11 @@ int main() {
     int count = 0;
     
     std::pair<Suit, int> p;
+    cv::Mat interestingFrameGray;
     // In un progetto reale qui chiameremmo Occhi::recognize(interestingFrame)
     while (vfm.getNextInterestingFrame(interestingFrame)) {
-        watcher.recognize(interestingFrame,p);
+        cv::cvtColor(interestingFrame,interestingFrameGray,cv::COLOR_BGR2GRAY);
+        watcher.recognize(interestingFrameGray,p);
         count++;
         std::cout << "Trovato frame interessante numero: " << count << std::endl;
         std::cout << "Found card " << p.first << " " << p.second << std::endl;
