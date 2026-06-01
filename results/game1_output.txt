@@ -1,0 +1,15 @@
+====================================================
+           BRISCOLA TRACKER - FINAL REPORT          
+====================================================
+
+Round   North Card        South Card        Winner    Points
+------------------------------------------------------------
+1       8 spades          5 coins           South     2
+2       7 clubs           3 clubs           North     10
+
+============================================================
+GAME SUMMARY
+Total Points North: 10
+Total Points South: 2
+WINNER: NORTH
+====================================================
