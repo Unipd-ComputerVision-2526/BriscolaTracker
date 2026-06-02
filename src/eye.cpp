@@ -7,7 +7,12 @@ Eye::Eye()
     recognizedCards_ = std::vector<std::pair<Suit, int>>();
     fast_  = cv::FastFeatureDetector::create();
     sift_ = cv::SIFT::create();
+    orb_ = cv::ORB::create(500,1.2f,8,31,0,2,cv::ORB::HARRIS_SCORE,31,20);
+    auto indexParams = cv::makePtr<cv::flann::LshIndexParams>(12,20,2);
+    auto searchParams = cv::makePtr<cv::flann::SearchParams>(50);
     matcher_ = cv::FlannBasedMatcher();
+    //matcher_ = cv::FlannBasedMatcher(indexParams,searchParams);
+    BFmatcher_ = cv::BFMatcher(cv::NORM_HAMMING2);
 }
 
 void Eye::clear()
@@ -30,7 +35,6 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset)
     {
         std::pair<Suit, int> p={std::get<1>(card), std::get<2>(card)};
-        std::cout<<p.first<<" "<<p.second<<std::endl;
         const cv::Mat& img = std::get<0>(card);
 
         //fast_->detect(img, keypoints);
@@ -41,13 +45,16 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
         matcher_.add(descriptors);
         cardVector_.push_back(p);
         //cardMap_.insert({p, descriptors});
+
+        keypoints.clear();
+        descriptors.release();
     }
     matcher_.train();
 
     if (!validModelState())
     {
         cardVector_.clear();
-        //cardMap_.clear();
+        cardMap_.clear();
         throw std::invalid_argument("EyeError: dataset not usable for a Briscola match.");
     }
 }
@@ -113,6 +120,10 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
         cv::MORPH_RECT,
         cv::Size(5,5)
     );
+    cv::Mat erosion_kernel_2 = cv::getStructuringElement(
+        cv::MORPH_RECT,
+        cv::Size(21,21)
+    );
     cv::Mat dilate_kernel = cv::getStructuringElement(
         cv::MORPH_RECT,
         cv::Size(31,31)
@@ -125,7 +136,8 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
 
     cv::threshold(blurred,blurred,filter,255,cv::THRESH_BINARY);
     cv::erode(blurred, blurred, erosion_kernel);
-    cv::dilate(blurred, mask, dilate_kernel);
+    cv::dilate(blurred, blurred, dilate_kernel);
+    cv::erode(blurred, mask, erosion_kernel_2);
 
     return true;
 }
@@ -133,6 +145,7 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
 bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
 {
     std::vector<std::vector<cv::DMatch>> matches;
+    std::vector<cv::DMatch> BFmatches;
     std::vector<cv::KeyPoint> keypoints;
     std::vector<int>::iterator maxCounts;
     std::vector<int> matchCount(cardVector_.size());
@@ -142,14 +155,15 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
 
     //fast_->detect(img,keypoints,mask);
     //sift_->compute(img,keypoints,descriptors);
-
-    sift_->detectAndCompute(img, mask, keypoints, descriptors);
     
+    sift_->detectAndCompute(img,mask,keypoints,descriptors);
+
     cv::Mat img_keypoints;
     cv::drawKeypoints(img, keypoints, img_keypoints, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT);
     cv::imshow("FAST Keypoints with SIFT Descriptors", img_keypoints);
 
     matcher_.knnMatch(descriptors, matches, 2);
+
     for(int i=0; i<matches.size();i++)
     {
         if(matches[i].size() >= 2 && matches[i][0].distance < ratio*matches[i][1].distance)
@@ -158,6 +172,10 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
             matchCount[imgIdx]++;
         }
     }
+
+    for(int i=0; i<matchCount.size();i++)
+        std::cout<<matchCount[i]<<" ";
+    std::cout<<std::endl;
 
     maxCounts = std::max_element(matchCount.begin(),matchCount.end());
     imgIdx = std::distance(matchCount.begin(),maxCounts);
@@ -175,7 +193,8 @@ bool Eye::recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card)
 
     cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
     findCardPosition(rescaled, lastMask_);
-    if (!findCardValue(rescaled, lastMask_, card))
+    cv::resize(lastMask_, lastMask_, cv::Size(lastMask_.cols*3, lastMask_.rows*3));
+    if (!findCardValue(img, lastMask_, card))
         return false;
     return true;
 }
@@ -186,11 +205,12 @@ bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card)
 
     cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
     findCardPosition(rescaled, mask);
+    cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
     diffMask = mask - lastMask_;
     
     cv::imshow("",diffMask);
 
-    findCardValue(rescaled, diffMask, card);
+    findCardValue(img, diffMask, card);
 
     lastMask_ = mask.clone();
     return true;

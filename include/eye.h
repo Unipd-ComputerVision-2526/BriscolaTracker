@@ -22,8 +22,10 @@ class Eye
         cv::Ptr<cv::FastFeatureDetector> fast_;
         // Feature extractor
         cv::Ptr<cv::SIFT> sift_;
+        cv::Ptr<cv::ORB> orb_;
         // Feature Matcher
         cv::FlannBasedMatcher matcher_;
+        cv::BFMatcher BFmatcher_;
         // Recognized card with suit and value
         std::pair<Suit, int> card_;
         // Map that associates image descriptors and cards
