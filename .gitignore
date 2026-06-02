@@ -47,6 +47,9 @@ build-*/
 # Dataset directories
 dataset/
 
+# VSCODE directories
+/.vscode
+
 # CMake generated files
 CMakeFiles/
 CMakeCache.txt
@@ -73,3 +76,5 @@ Testing/
 
 #file markdown
 *.md
+
+briscola_final_project-_1_.txt
