@@ -4,7 +4,6 @@
 
 //TO DO: serve FARE UNa tradzuione di numero -- carta??
 
-
 //returns the rank of the card for comparison purposes (higher = stronger card)
 //ranking: 1 > 3 > 10 > 9 > 8 > 7 > 6 > 5 > 4 > 2
 static int cardRank(int number) {
@@ -39,10 +38,9 @@ static int cardPoints(int number) {
 //--------------CONSTRUCTOR--------------
 
 Briscola::Briscola(Suit suit, int players) 
-    : briscolaSeed(suit), 
+    : briscolaSuit(suit), 
     players(players), 
     nextFirstPlayer(0) {
-    //TO DO: resize o assign?? perchè uno mantiene i punteggi per tutta la partita, non solo per il round corrente
     scores.resize(players, 0);
 
     if(players != 2) {
@@ -72,8 +70,8 @@ std::vector<int> Briscola::getScores() {
     return scores;
 }
 
-Suit Briscola::getBriscolaSeed() {
-    return briscolaSeed;
+Suit Briscola::getBriscolaSuit() {
+    return briscolaSuit;
 }
 
 //--------------PRIVATE METHODS--------------
@@ -118,8 +116,8 @@ int Briscola::computeRound() {
         const std::pair<Suit, int>& challenger = currentRoundCards[i]; //challenger's card
         const std::pair<Suit, int>& current    = currentRoundCards[winnerCardIdx]; //current winning card
 
-        bool challengerIsBriscola = (challenger.first == briscolaSeed);
-        bool currentIsBriscola    = (current.first    == briscolaSeed);
+        bool challengerIsBriscola = (challenger.first == briscolaSuit);
+        bool currentIsBriscola    = (current.first    == briscolaSuit);
 
         if (challengerIsBriscola && !currentIsBriscola) {
             // next player's card is briscola, current winning card is not → next player takes the lead
