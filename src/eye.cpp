@@ -23,13 +23,16 @@ void Eye::clear()
 
 void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
 {
+    std::vector<cv::Mat> channels;
+    std::vector<cv::Mat> trainReadyDesc;
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
+    cv::Mat allDescriptors;
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset){
         const cv::Mat& img = std::get<0>(card);
         if(!isValidImage(img))
-            throw std::invalid_argument("EyeError: At least an image in the dataset has not the right file format. Grayscale images needed.");
+            throw std::invalid_argument("EyeError: At least an image in the dataset has not the right file format. BGR/RGB images needed.");
     }
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset)
@@ -37,17 +40,22 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
         std::pair<Suit, int> p={std::get<1>(card), std::get<2>(card)};
         const cv::Mat& img = std::get<0>(card);
 
-        //fast_->detect(img, keypoints);
-        //sift_->compute(img, keypoints, descriptors);
-        
-        sift_->detectAndCompute(img, cv::noArray(), keypoints, descriptors);
+        cv::split(img,channels);
+        for(int i=0;i<3;i++)
+        {
+            sift_->detectAndCompute(channels[i], cv::noArray(), keypoints, descriptors);
+            if(!descriptors.empty())
+                allDescriptors.push_back(descriptors);
+            descriptors.release();
+        }
 
-        matcher_.add(descriptors);
+        allDescriptors.convertTo(allDescriptors,CV_32F);
+        trainReadyDesc = {allDescriptors};
+        matcher_.add(trainReadyDesc);
         cardVector_.push_back(p);
-        //cardMap_.insert({p, descriptors});
 
         keypoints.clear();
-        descriptors.release();
+        allDescriptors.release();
     }
     matcher_.train();
 
@@ -61,15 +69,14 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
 
 bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
 {
-    bool result;
+    bool result=true;
     if (cardVector_.size()==0)
-    //if (cardMap_.size()==0)
         throw std::logic_error("EyeError: Attempt to call the model before training it.");
-    if (image.channels()!=1)
-        throw std::invalid_argument("EyeError: Only grayscale frame used for feature detection.");
+    if (image.channels()!=3)
+        throw std::invalid_argument("EyeError: Only BGR/RGB frame used for feature detection.");
     
-    if (recognizedCards_.size()==0)
-        result = recognizeBriscola(image,card);
+    if (recognizedCards_.size()==0 || !recognizedBriscola)
+        recognizedBriscola = recognizeBriscola(image,card);
     else
         result = recognizeRoundCard(image,card);
 
@@ -77,7 +84,7 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
         return false;
 
     recognizedCards_.push_back(card);
-    return result;
+    return result && recognizedBriscola;
 }
 
 bool Eye::isValidImage(const cv::Mat& img){
@@ -87,14 +94,13 @@ bool Eye::isValidImage(const cv::Mat& img){
         return false;
     if (img.depth() != CV_8U && img.depth() != CV_16U && img.depth() != CV_32F)
         return false;
-    if (img.channels()!=1)
+    if (img.channels()!=3)
         return false;
     return true;
 }
 
 bool Eye::validModelState(){
     if (cardVector_.size()<40)
-    //if (cardMap_.size()<40)
         return false;
 
     for (int suit=1; suit<5; suit++)
@@ -103,7 +109,6 @@ bool Eye::validModelState(){
         {
             std::pair<Suit, int> p={static_cast<Suit>(suit), v};
             if (count(cardVector_.begin(),cardVector_.end(),p)!=1)
-            //if (cardMap_.count(p)!=1)
             {
                 return false;
             }
@@ -128,8 +133,8 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
         cv::MORPH_RECT,
         cv::Size(31,31)
     );
-    //cv::cvtColor(img,mask,cv::COLOR_BGR2GRAY);
-    cv::GaussianBlur(img,blurred,cv::Size(23,23),0);
+    cv::cvtColor(img,blurred,cv::COLOR_BGR2GRAY);
+    cv::GaussianBlur(blurred,blurred,cv::Size(23,23),0);
 
     cv::minMaxLoc(blurred, &min, &max);
     filter = min+(max-min)/1.5;
@@ -138,6 +143,9 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
     cv::erode(blurred, blurred, erosion_kernel);
     cv::dilate(blurred, blurred, dilate_kernel);
     cv::erode(blurred, mask, erosion_kernel_2);
+
+    if(cv::countNonZero(mask) < (img.rows*img.cols)*0.02)
+        return false;
 
     return true;
 }
@@ -152,9 +160,6 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     cv::Mat descriptors;
     float ratio = 0.75f;
     int imgIdx, maxIdx;
-
-    //fast_->detect(img,keypoints,mask);
-    //sift_->compute(img,keypoints,descriptors);
     
     sift_->detectAndCompute(img,mask,keypoints,descriptors);
 
@@ -181,7 +186,7 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     imgIdx = std::distance(matchCount.begin(),maxCounts);
     card = cardVector_[imgIdx];
 
-    if(*maxCounts == 0)
+    if(*maxCounts < 10)
         return false;
 
     return true;
@@ -192,7 +197,8 @@ bool Eye::recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card)
     cv::Mat rescaled;
 
     cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
-    findCardPosition(rescaled, lastMask_);
+    if(!findCardPosition(rescaled, lastMask_))
+        return false;
     cv::resize(lastMask_, lastMask_, cv::Size(lastMask_.cols*3, lastMask_.rows*3));
     if (!findCardValue(img, lastMask_, card))
         return false;
@@ -210,7 +216,8 @@ bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card)
     
     cv::imshow("",diffMask);
 
-    findCardValue(img, diffMask, card);
+    if(!findCardValue(img, diffMask, card))
+        return false;
 
     lastMask_ = mask.clone();
     return true;

@@ -64,7 +64,8 @@ std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datas
         std::string filename = entry.path().filename().string();
 
         if (parseFileName(filename, numero, seme)) {
-            cv::Mat img = cv::imread(entry.path().string(), cv::IMREAD_GRAYSCALE);
+            //cv::Mat img = cv::imread(entry.path().string(), cv::IMREAD_GRAYSCALE);
+            cv::Mat img = cv::imread(entry.path().string());
             if (!img.empty()) {
                 dataset.push_back(std::make_tuple(img, seme, numero));
             } else {

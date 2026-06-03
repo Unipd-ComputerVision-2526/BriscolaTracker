@@ -37,6 +37,8 @@ class Eye
         // Last used mask
         cv::Mat lastMask_;
 
+        bool recognizedBriscola=true;
+
         bool isValidImage(const cv::Mat& img);
         bool validModelState();
 

@@ -5,6 +5,7 @@
 #include <utils.h>
 #include <video_manager.h>
 #include <eye.h>
+#include <briscola.h>
 
 int main() {
     // 1. Test Caricamento Dataset (Gia' verificato)
@@ -37,10 +38,12 @@ int main() {
     
     std::pair<Suit, int> p;
     cv::Mat interestingFrameGray;
+
     // In un progetto reale qui chiameremmo Occhi::recognize(interestingFrame)
     while (vfm.getNextInterestingFrame(interestingFrame)) {
-        cv::cvtColor(interestingFrame,interestingFrameGray,cv::COLOR_BGR2GRAY);
-        watcher.recognize(interestingFrameGray,p);
+        //cv::cvtColor(interestingFrame,interestingFrameGray,cv::COLOR_BGR2GRAY);
+        if(!watcher.recognize(interestingFrame,p))
+            continue;
         count++;
         std::cout << "Trovato frame interessante numero: " << count << std::endl;
         std::cout << "Found card " << p.first << " " << p.second << std::endl;
