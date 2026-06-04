@@ -1,0 +1,8 @@
+Legend:
+    [ ] - needs attention
+    [X] - done
+
+[ ] Find coins, some ideas:
+    - Combine SIFT with Hough Circles (count them)
+[ ] Adjust masks/segmentation in Eye class, some ideas:
+    - Use masks not for feature extraction but to differenciate frames
