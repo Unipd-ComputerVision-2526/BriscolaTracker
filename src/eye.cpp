@@ -76,15 +76,18 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
         throw std::invalid_argument("EyeError: Only BGR/RGB frame used for feature detection.");
     
     if (recognizedCards_.size()==0 || !recognizedBriscola)
-        recognizedBriscola = recognizeBriscola(image,card);
+        result = recognizeBriscola(image,card);
     else
         result = recognizeRoundCard(image,card);
 
+    if(!result)
+        return false;
     if(std::count(recognizedCards_.begin(),recognizedCards_.end(),card)!=0)
         return false;
 
     recognizedCards_.push_back(card);
-    return result && recognizedBriscola;
+    std::cout<<"TROVATO "<<recognizedCards_.size()<<std::endl;
+    return true;
 }
 
 bool Eye::isValidImage(const cv::Mat& img){
@@ -188,7 +191,7 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
 
     if(*maxCounts < 10)
         return false;
-
+    std::cout<<"CARTA TROVATA"<<std::endl;
     return true;
 }
 
@@ -202,6 +205,8 @@ bool Eye::recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card)
     cv::resize(lastMask_, lastMask_, cv::Size(lastMask_.cols*3, lastMask_.rows*3));
     if (!findCardValue(img, lastMask_, card))
         return false;
+
+    recognizedBriscola=true;
     return true;
 }
 

@@ -2,16 +2,10 @@
 #define BRISCOLA_H
 
 #include <vector>
-//#include "utils.h"
+#include "utils.h"
 
 //TO DO: DOVREBBE ESSERE c'è già in utils.h
 //alcune classi vengono messe con const! controllare questa cosa
-enum class Suit {
-    COINS,   // Denari
-    CUPS,    // Coppe
-    SWORDS,  // Spade
-    CLUBS    // Bastoni
-};
 
 class Briscola{
     public:
@@ -22,7 +16,7 @@ class Briscola{
         // Return the current scores of the players.
         std::vector<int> getScores();
         // Return the suit of the briscola.
-        Suit getBriscolaSeed();
+        Suit getBriscolaSuit();
 
     private:
         // Update the scores of the players with the new scores provided
@@ -37,7 +31,7 @@ class Briscola{
         // Index of the player who will play first in the next round (0-based index).
         int nextFirstPlayer;
         // Seed of the briscola for the game, which determines the Briscola (trump suit).
-        Suit briscolaSeed;
+        Suit briscolaSuit;
         // Cards played in the current round, with suit and number.
         std::vector<std::pair<Suit, int>> currentRoundCards;
         // Current scores of the players, for the entire game.

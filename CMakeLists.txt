@@ -17,6 +17,7 @@ add_executable(${PROJECT_NAME}
     src/video_manager.cpp
     src/eye.cpp
     src/reporter.cpp
+    src/briscola.cpp
     )
 
 #add_executable(test_refactoring

@@ -17,6 +17,8 @@ class Eye
         // Recognize the card in an image, returns suit and value in the argument pair
         bool recognize(const cv::Mat& image, std::pair<Suit, int>& card);
 
+        bool hasBriscola() {return recognizedBriscola;};
+
     private:
         // Feature detector
         cv::Ptr<cv::FastFeatureDetector> fast_;
@@ -37,7 +39,7 @@ class Eye
         // Last used mask
         cv::Mat lastMask_;
 
-        bool recognizedBriscola=true;
+        bool recognizedBriscola=false;
 
         bool isValidImage(const cv::Mat& img);
         bool validModelState();

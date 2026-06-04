@@ -1,4 +1,4 @@
-#include "Briscola.h"
+#include <briscola.h>
 #include <stdexcept>
 #include <algorithm>
 
@@ -146,6 +146,7 @@ int Briscola::computeRound() {
     for (const std::pair<Suit, int>& card : currentRoundCards)
         roundPoints += cardPoints(card.second);
  
+    std::cout<<"POINTS OF THIS ROUND: "<<roundPoints<<std::endl;
     std::vector<int> newScores = scores;
     newScores[globalWinner] += roundPoints;
     setScores(newScores);

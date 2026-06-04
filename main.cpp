@@ -35,21 +35,31 @@ int main() {
 
     cv::Mat interestingFrame;
     int count = 0;
+    int players = 2;
     
     std::pair<Suit, int> p;
     cv::Mat interestingFrameGray;
 
+    vfm.getNextInterestingFrame(interestingFrame);
+    watcher.recognize(interestingFrame,p);
+    Briscola game = Briscola(p.first, players);
+    
     // In un progetto reale qui chiameremmo Occhi::recognize(interestingFrame)
     while (vfm.getNextInterestingFrame(interestingFrame)) {
         //cv::cvtColor(interestingFrame,interestingFrameGray,cv::COLOR_BGR2GRAY);
         if(!watcher.recognize(interestingFrame,p))
             continue;
+
+        game.addCardToRound(p.first,p.second);
         count++;
         std::cout << "Trovato frame interessante numero: " << count << std::endl;
         std::cout << "Found card " << p.first << " " << p.second << std::endl;
         // Per visualizzare (opzionale, utile per debug)
         cv::imshow("Frame Interessante", interestingFrame);
         
+        if(count==players)
+            break;
+
         // Aspetta 500ms tra un frame e l'altro per permetterci di vederli
         // Premere un tasto per andare al prossimo o aspettare
         if (cv::waitKey(500) == 27) break; // ESC per uscire
@@ -57,6 +67,9 @@ int main() {
         cv::waitKey(0);
     }
 
+    std::vector<int> scores = game.getScores();
+
+    std::cout << "Round results "<< scores[0] << " " << scores[1] <<std::endl;
     std::cout << "Totale frame estratti per questo round: " << count << std::endl;
     std::cout << "Fine test video." << std::endl;
 
