@@ -181,8 +181,10 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
         }
     }
 
-    for(int i=0; i<matchCount.size();i++)
+    for(int i=0; i<matchCount.size();i++) {
+        if (i > 0 && i % 10 == 0) std::cout << "| ";
         std::cout<<matchCount[i]<<" ";
+    }
     std::cout<<std::endl;
 
     maxCounts = std::max_element(matchCount.begin(),matchCount.end());
