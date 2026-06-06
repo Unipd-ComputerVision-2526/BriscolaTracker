@@ -7,5 +7,4 @@ Legend:
 [ ] Adjust masks/segmentation in Eye class, some ideas:
     - Use masks not for feature extraction but to differenciate frames
 
-//capire come mai la maschera del game 4 non fa riconoscere la briscola, prima carta del gioco:
 [ ] Understand why the mask of game 4 does not recognize the briscola, first card of the game
