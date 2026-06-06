@@ -91,39 +91,60 @@ void Reporter::calculateMetrics(const std::string& groundTruthPath) const {
     std::ifstream file(groundTruthPath);
     if (!checkStream(file, groundTruthPath)) return;
 
+    auto safeStoi = [](const std::string& s) {
+        if (s.empty()) return 0;
+        try { return std::stoi(s); }
+        catch (...) { return 0; }
+    };
+
     std::string line, val;
     std::vector<RoundData> gt;
-    std::getline(file, line);
+    std::getline(file, line); // Skip header
 
     while (std::getline(file, line)) {
+        if (line.empty()) continue;
         std::stringstream ss(line);
         RoundData r;
-        std::getline(ss, val, ','); r.round = std::stoi(val); // Read Round column
-        std::getline(ss, val, ','); r.northNumber = std::stoi(val);
+        std::getline(ss, val, ','); r.round = safeStoi(val); // Read Round column
+        std::getline(ss, val, ','); r.northNumber = safeStoi(val);
         std::getline(ss, val, ','); r.northSuit = stringToSuitInternal(val);
-        std::getline(ss, val, ','); r.southNumber = std::stoi(val);
+        std::getline(ss, val, ','); r.southNumber = safeStoi(val);
         std::getline(ss, val, ','); r.southSuit = stringToSuitInternal(val);
-        std::getline(ss, val, ','); r.briscolaNumber = std::stoi(val);
+        std::getline(ss, val, ','); r.briscolaNumber = safeStoi(val);
         std::getline(ss, val, ','); r.briscolaSuit = stringToSuitInternal(val);
         std::getline(ss, val, ','); r.leader = val;
+        // Fix typo in ground truth ("Sud" instead of "South")
+        if (r.leader == "Sud") r.leader = "South";
         std::getline(ss, val, ','); r.winner = val;
-        std::getline(ss, val, ','); r.points = std::stoi(val);
+        if (r.winner == "Sud") r.winner = "South";
+        std::getline(ss, val, ','); r.points = safeStoi(val);
         gt.push_back(r);
     }
 
     int correctCards = 0, correctPlayers = 0, correctBriscola = 0;
-    size_t count = std::min(history_.size(), gt.size());
+    int totalEvaluated = 0;
 
-    for (size_t i = 0; i < count; ++i) {
-        if (history_[i].northNumber == gt[i].northNumber && history_[i].northSuit == gt[i].northSuit) correctCards++;
-        if (history_[i].southNumber == gt[i].southNumber && history_[i].southSuit == gt[i].southSuit) correctCards++;
-        if (history_[i].leader == gt[i].leader) correctPlayers++;
-        if (history_[i].winner == gt[i].winner) correctPlayers++;
-        if (history_[i].briscolaNumber == gt[i].briscolaNumber && history_[i].briscolaSuit == gt[i].briscolaSuit) correctBriscola++;
+    for (const auto& loggedRound : history_) {
+        // Find matching round in ground truth
+        auto it = std::find_if(gt.begin(), gt.end(), [&loggedRound](const RoundData& g) {
+            return g.round == loggedRound.round;
+        });
+
+        if (it != gt.end()) {
+            totalEvaluated++;
+            if (loggedRound.northNumber == it->northNumber && loggedRound.northSuit == it->northSuit) correctCards++;
+            if (loggedRound.southNumber == it->southNumber && loggedRound.southSuit == it->southSuit) correctCards++;
+            if (loggedRound.leader == it->leader) correctPlayers++;
+            if (loggedRound.winner == it->winner) correctPlayers++;
+            if (loggedRound.briscolaNumber == it->briscolaNumber && loggedRound.briscolaSuit == it->briscolaSuit) correctBriscola++;
+        }
     }
 
     std::cout << "\n--- PERFORMANCE METRICS ---" << std::endl;
+    // We expect exactly 40 cards across 20 rounds, and 40 player ID validations.
+    // If some rounds are missing, they count as wrong (hence dividing by 40.0)
     std::cout << "Card Recognition Accuracy: " << (static_cast<double>(correctCards) / 40.0) * 100.0 << "%" << std::endl;
     std::cout << "Player Identification Accuracy: " << (static_cast<double>(correctPlayers) / 40.0) * 100.0 << "%" << std::endl;
-    std::cout << "Briscola Recognition Accuracy: " << (count > 0 ? (static_cast<double>(correctBriscola) / static_cast<double>(count)) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Briscola Recognition Accuracy: " << (static_cast<double>(correctBriscola) / 20.0) * 100.0 << "%" << std::endl;
+    std::cout << "Rounds Evaluated: " << totalEvaluated << " / 20" << std::endl;
 }
