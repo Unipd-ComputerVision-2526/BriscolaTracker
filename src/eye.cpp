@@ -17,8 +17,11 @@ Eye::Eye()
 
 void Eye::clear()
 {
-    cardMap_.clear();
+    // NON pulire cardMap_ o cardVector_ qui se vuoi mantenere il training!
+    // Questa funzione dovrebbe resettare solo lo stato della partita corrente.
     recognizedCards_.clear();
+    recognizedBriscola = false;
+    lastMask_ = cv::Mat();
 }
 
 void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
@@ -219,9 +222,14 @@ bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card)
     cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
     findCardPosition(rescaled, mask);
     cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
-    diffMask = mask - lastMask_;
     
-    cv::imshow("",diffMask);
+    if (lastMask_.empty()) {
+        diffMask = mask.clone();
+    } else {
+        diffMask = mask - lastMask_;
+    }
+    
+    cv::imshow("Difference Mask", diffMask);
 
     if(!findCardValue(img, diffMask, card))
         return false;

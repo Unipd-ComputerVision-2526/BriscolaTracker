@@ -17,6 +17,10 @@ class Briscola{
         std::vector<int> getScores();
         // Return the suit of the briscola.
         Suit getBriscolaSuit();
+        // Return the index of the player who starts the current round
+        int getNextFirstPlayer() const { return nextFirstPlayer; }
+        // Return the points of the last completed round
+        int getLastRoundPoints() const { return lastRoundPoints; }
 
     private:
         // Update the scores of the players with the new scores provided
@@ -30,6 +34,8 @@ class Briscola{
         int players;
         // Index of the player who will play first in the next round (0-based index).
         int nextFirstPlayer;
+        // Points of the last round
+        int lastRoundPoints;
         // Seed of the briscola for the game, which determines the Briscola (trump suit).
         Suit briscolaSuit;
         // Cards played in the current round, with suit and number.

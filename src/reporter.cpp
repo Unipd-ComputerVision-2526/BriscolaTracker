@@ -98,6 +98,7 @@ void Reporter::calculateMetrics(const std::string& groundTruthPath) const {
     while (std::getline(file, line)) {
         std::stringstream ss(line);
         RoundData r;
+        std::getline(ss, val, ','); r.round = std::stoi(val); // Read Round column
         std::getline(ss, val, ','); r.northNumber = std::stoi(val);
         std::getline(ss, val, ','); r.northSuit = stringToSuitInternal(val);
         std::getline(ss, val, ','); r.southNumber = std::stoi(val);

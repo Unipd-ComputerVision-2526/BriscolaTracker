@@ -18,6 +18,10 @@ class Eye
         bool recognize(const cv::Mat& image, std::pair<Suit, int>& card);
 
         bool hasBriscola() {return recognizedBriscola;};
+        void setBriscola(std::pair<Suit, int> b) { 
+            recognizedCards_.push_back(b); 
+            recognizedBriscola = true; 
+        }
 
     private:
         // Feature detector

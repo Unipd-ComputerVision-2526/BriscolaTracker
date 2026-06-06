@@ -47,34 +47,35 @@ bool parseFileName(const std::string& filename, int& numero, Suit& seme) {
 // Legge tutte le immagini delle carte dal percorso specificato.
 std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datasetPath) {
     std::vector<std::tuple<cv::Mat, Suit, int>> dataset;
-    
+
     if (!fs::exists(datasetPath)) {
         std::cerr << "Errore: Cartella dataset non trovata: " << datasetPath << std::endl;
         return dataset;
     }
 
-    const fs::directory_iterator directoryIterator(datasetPath); //iteratore per scorrere i file nella cartella dataset
-    for (const fs::directory_entry& entry : directoryIterator) { //per ogni file nella cartella dataset
-        if (!isValidImageFile(entry)) {
-            continue;
+    std::vector<std::string> filePaths;
+    for (const auto& entry : fs::directory_iterator(datasetPath)) {
+        if (isValidImageFile(entry)) {
+            filePaths.push_back(entry.path().string());
         }
+    }
+    std::sort(filePaths.begin(), filePaths.end());
 
+    for (const std::string& filePath : filePaths) {
+        fs::path p(filePath);
         int numero = 0;
         Suit seme = COINS;
-        std::string filename = entry.path().filename().string();
+        std::string filename = p.filename().string();
 
         if (parseFileName(filename, numero, seme)) {
-            //cv::Mat img = cv::imread(entry.path().string(), cv::IMREAD_GRAYSCALE);
-            cv::Mat img = cv::imread(entry.path().string());
+            cv::Mat img = cv::imread(filePath);
             if (!img.empty()) {
                 dataset.push_back(std::make_tuple(img, seme, numero));
             } else {
                 std::cerr << "Errore lettura immagine: " << filename << std::endl;
             }
-        } else {
-            // Ignoro silenziosamente i file che non seguono il pattern "numero-seme.JPG" per evitare di loggare file ausiliari come Zone.Identifier (che hanno .JPG:Zone...)
         }
     }
-    
+
     return dataset;
 }

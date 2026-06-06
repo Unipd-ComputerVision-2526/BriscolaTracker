@@ -6,10 +6,15 @@
 
 class VideoFrameManager {
 public:
-    // Costruttore: apre il video e imposta i parametri di salto frame e soglia movimento
-    // motionThreshold: indica quanta differenza deve esserci tra i frame per considerarli diversi
-    VideoFrameManager(const std::string& videoPath, int frameSkip = 10, double motionThreshold = 5.0);
+    // Costruttore per default motion detection (usa 10 e 5.0)
+    explicit VideoFrameManager(const std::string& videoPath);
+
+    // Costruttore esplicito per motion detection
+    VideoFrameManager(const std::string& videoPath, int frameSkip, double motionThreshold);
     
+    // Costruttore per campionamento fisso di N frame
+    VideoFrameManager(const std::string& videoPath, int totalFramesToExtract);
+
     // Distruttore: rilascia le risorse del video
     ~VideoFrameManager();
 
@@ -24,6 +29,12 @@ private:
     cv::Mat lastInterestingFrameGray;
     int skip;
     double threshold;
+
+    // Variabili per campionamento fisso
+    bool fixedMode = false;
+    int targetCount = 0;
+    int extractedCount = 0;
+    int frameStep = 0;
     
     // Funzione interna per calcolare la differenza tra due frame (SAD)
     double calculateFrameDifference(const cv::Mat& current, const cv::Mat& last);

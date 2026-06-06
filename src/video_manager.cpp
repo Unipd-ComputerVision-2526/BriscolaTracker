@@ -1,10 +1,34 @@
 #include "video_manager.h"
 #include <iostream>
 
-VideoFrameManager::VideoFrameManager(const std::string& videoPath, int frameSkip, double motionThreshold) 
-    : cap(videoPath), skip(frameSkip), threshold(motionThreshold) {
+VideoFrameManager::VideoFrameManager(const std::string& videoPath)
+    : cap(videoPath), skip(10), threshold(5.0), fixedMode(false) {
     if (!cap.isOpened()) {
         std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+    }
+}
+
+VideoFrameManager::VideoFrameManager(const std::string& videoPath, int frameSkip, double motionThreshold) 
+    : cap(videoPath), skip(frameSkip), threshold(motionThreshold), fixedMode(false) {
+    if (!cap.isOpened()) {
+        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+    }
+}
+
+VideoFrameManager::VideoFrameManager(const std::string& videoPath, int totalFramesToExtract)
+    : cap(videoPath), fixedMode(true), targetCount(totalFramesToExtract), extractedCount(0) {
+    
+    if (!cap.isOpened()) {
+        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        return;
+    }
+
+    double totalFrames = cap.get(cv::CAP_PROP_FRAME_COUNT);
+    if (totalFrames > 0 && totalFramesToExtract > 0) {
+        frameStep = static_cast<int>(totalFrames) / totalFramesToExtract;
+        if (frameStep == 0) frameStep = 1;
+    } else {
+        frameStep = 1;
     }
 }
 
@@ -31,6 +55,20 @@ double VideoFrameManager::calculateFrameDifference(const cv::Mat& current, const
 
 bool VideoFrameManager::getNextInterestingFrame(cv::Mat& frame) {
     if (!cap.isOpened()) return false;
+
+    if (fixedMode) {
+        if (extractedCount >= targetCount) return false;
+
+        // Posizionati al frame corretto
+        int targetPos = extractedCount * frameStep;
+        cap.set(cv::CAP_PROP_POS_FRAMES, targetPos);
+
+        if (cap.read(frame)) {
+            extractedCount++;
+            return true;
+        }
+        return false;
+    }
 
     cv::Mat currentFrame;
     while (cap.read(currentFrame)) {
