@@ -41,7 +41,8 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset)
     {
         std::pair<Suit, int> p={std::get<1>(card), std::get<2>(card)};
-        const cv::Mat& img = std::get<0>(card);
+        const cv::Mat& original_img = std::get<0>(card);
+        cv::Mat img = preprocessImage(original_img);
 
         cv::split(img,channels);
         for(int i=0;i<3;i++)
@@ -121,6 +122,28 @@ bool Eye::validModelState(){
         }
     }
     return true;
+}
+
+cv::Mat Eye::preprocessImage(const cv::Mat& img) {
+    if (img.empty()) return img;
+    cv::Mat lab_img;
+    cv::cvtColor(img, lab_img, cv::COLOR_BGR2Lab);
+    
+    std::vector<cv::Mat> lab_channels;
+    cv::split(lab_img, lab_channels);
+    
+    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+    clahe->setClipLimit(3.0);
+    clahe->setTilesGridSize(cv::Size(8, 8));
+    
+    cv::Mat clahe_l_channel;
+    clahe->apply(lab_channels[0], clahe_l_channel);
+    
+    clahe_l_channel.copyTo(lab_channels[0]);
+    cv::Mat preprocessed_img;
+    cv::merge(lab_channels, preprocessed_img);
+    cv::cvtColor(preprocessed_img, preprocessed_img, cv::COLOR_Lab2BGR);
+    return preprocessed_img;
 }
 
 bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
