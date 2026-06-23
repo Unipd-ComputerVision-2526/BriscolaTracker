@@ -5,23 +5,26 @@ Eye::Eye()
 {
     cardMap_ = std::map<std::pair<Suit, int>, std::vector<cv::Mat>>();
     recognizedCards_ = std::vector<std::pair<Suit, int>>();
-    fast_  = cv::FastFeatureDetector::create();
     sift_ = cv::SIFT::create();
-    orb_ = cv::ORB::create(500,1.2f,8,31,0,2,cv::ORB::HARRIS_SCORE,31,20);
+    
     auto indexParams = cv::makePtr<cv::flann::LshIndexParams>(12,20,2);
     auto searchParams = cv::makePtr<cv::flann::SearchParams>(50);
     matcher_ = cv::FlannBasedMatcher();
     //matcher_ = cv::FlannBasedMatcher(indexParams,searchParams);
-    BFmatcher_ = cv::BFMatcher(cv::NORM_HAMMING2);
 }
 
 void Eye::clear()
 {
-    // NON pulire cardMap_ o cardVector_ qui se vuoi mantenere il training!
-    // Questa funzione dovrebbe resettare solo lo stato della partita corrente.
     recognizedCards_.clear();
     recognizedBriscola = false;
     lastMask_ = cv::Mat();
+}
+
+void Eye::reset()
+{
+    clear();
+    cardVector_.clear();
+    cardMap_.clear();
 }
 
 void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
@@ -35,7 +38,7 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset){
         const cv::Mat& img = std::get<0>(card);
         if(!isValidImage(img))
-            throw std::invalid_argument("EyeError: At least an image in the dataset has not the right file format. BGR/RGB images needed.");
+            throw std::invalid_argument("EyeError: At least an image in the dataset has not the right file format. 3 channels images needed.");
     }
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset)
@@ -77,7 +80,7 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
     if (cardVector_.size()==0)
         throw std::logic_error("EyeError: Attempt to call the model before training it.");
     if (image.channels()!=3)
-        throw std::invalid_argument("EyeError: Only BGR/RGB frame used for feature detection.");
+        throw std::invalid_argument("EyeError: Only 3 channels frame used for feature detection.");
     
     if (recognizedCards_.size()==0 || !recognizedBriscola)
         result = recognizeBriscola(image,card);
@@ -112,9 +115,9 @@ bool Eye::validModelState(){
 
     for (int suit=1; suit<5; suit++)
     {
-        for (int v=1; v<11; v++)
+        std::pair<Suit, int> p={static_cast<Suit>(suit), 1};
+        for (; p.second<11; p.second++)
         {
-            std::pair<Suit, int> p={static_cast<Suit>(suit), v};
             if (count(cardVector_.begin(),cardVector_.end(),p)!=1)
             {
                 return false;
@@ -126,6 +129,7 @@ bool Eye::validModelState(){
 
 cv::Mat Eye::preprocessImage(const cv::Mat& img) {
     if (img.empty()) return img;
+
     cv::Mat lab_img;
     cv::cvtColor(img, lab_img, cv::COLOR_BGR2Lab);
     
@@ -143,6 +147,7 @@ cv::Mat Eye::preprocessImage(const cv::Mat& img) {
     cv::Mat preprocessed_img;
     cv::merge(lab_channels, preprocessed_img);
     cv::cvtColor(preprocessed_img, preprocessed_img, cv::COLOR_Lab2BGR);
+
     return preprocessed_img;
 }
 
@@ -182,19 +187,18 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
 bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
 {
     std::vector<std::vector<cv::DMatch>> matches;
-    std::vector<cv::DMatch> BFmatches;
     std::vector<cv::KeyPoint> keypoints;
     std::vector<int>::iterator maxCounts;
     std::vector<int> matchCount(cardVector_.size());
     cv::Mat descriptors;
-    float ratio = 0.75f;
+    float ratio = 0.75f;    //lowe's ratio
     int imgIdx, maxIdx;
     
     sift_->detectAndCompute(img,mask,keypoints,descriptors);
 
     cv::Mat img_keypoints;
     cv::drawKeypoints(img, keypoints, img_keypoints, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT);
-    cv::imshow("FAST Keypoints with SIFT Descriptors", img_keypoints);
+    cv::imshow("SIFT Descriptors", img_keypoints);
 
     matcher_.knnMatch(descriptors, matches, 2);
 

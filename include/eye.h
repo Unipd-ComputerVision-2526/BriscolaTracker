@@ -10,8 +10,10 @@ class Eye
     public:
         // Constructor
         Eye();
-        // Object reset
+        // Clear match
         void clear();
+        // Clear also trained model
+        void reset();
         // Train the object with a set of image, each associated with suit and value
         void fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset);
         // Recognize the card in an image, returns suit and value in the argument pair
@@ -24,14 +26,10 @@ class Eye
         }
 
     private:
-        // Feature detector
-        cv::Ptr<cv::FastFeatureDetector> fast_;
         // Feature extractor
         cv::Ptr<cv::SIFT> sift_;
-        cv::Ptr<cv::ORB> orb_;
         // Feature Matcher
         cv::FlannBasedMatcher matcher_;
-        cv::BFMatcher BFmatcher_;
         // Recognized card with suit and value
         std::pair<Suit, int> card_;
         // Map that associates image descriptors and cards
