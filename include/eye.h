@@ -40,6 +40,8 @@ class Eye
         std::vector<std::pair<Suit, int>> recognizedCards_;
         // Last used mask
         cv::Mat lastMask_;
+        // Last seen frame;
+        cv::Mat residualImage_;
 
         bool recognizedBriscola=false;
 

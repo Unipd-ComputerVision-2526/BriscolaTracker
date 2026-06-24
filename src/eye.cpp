@@ -87,6 +87,8 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
     else
         result = recognizeRoundCard(image,card);
 
+    residualImage_=image.clone();
+
     if(!result)
         return false;
     if(std::count(recognizedCards_.begin(),recognizedCards_.end(),card)!=0)
@@ -153,33 +155,29 @@ cv::Mat Eye::preprocessImage(const cv::Mat& img) {
 
 bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
 {
-    double min, max, filter;
-    cv::Mat blurred;
-    cv::Mat erosion_kernel = cv::getStructuringElement(
-        cv::MORPH_RECT,
-        cv::Size(5,5)
-    );
-    cv::Mat erosion_kernel_2 = cv::getStructuringElement(
-        cv::MORPH_RECT,
-        cv::Size(21,21)
-    );
-    cv::Mat dilate_kernel = cv::getStructuringElement(
-        cv::MORPH_RECT,
-        cv::Size(31,31)
-    );
-    cv::cvtColor(img,blurred,cv::COLOR_BGR2GRAY);
-    cv::GaussianBlur(blurred,blurred,cv::Size(23,23),0);
+    cv::Mat gray;
+    cv::Mat er_kernel_1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+    cv::Mat er_kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5));
+    cv::Mat dil_kernel_1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,31));
+    cv::Mat dil_kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(21,9));
+    cv::Mat clo_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15,15));
+    
+    cv::medianBlur(img,gray, 5);
+    cv::erode(gray, gray, er_kernel_1);
 
-    cv::minMaxLoc(blurred, &min, &max);
-    filter = min+(max-min)/1.5;
-
-    cv::threshold(blurred,blurred,filter,255,cv::THRESH_BINARY);
-    cv::erode(blurred, blurred, erosion_kernel);
-    cv::dilate(blurred, blurred, dilate_kernel);
-    cv::erode(blurred, mask, erosion_kernel_2);
-
-    if(cv::countNonZero(mask) < (img.rows*img.cols)*0.02)
-        return false;
+    cv::cvtColor(gray, gray, cv::COLOR_BGR2GRAY);
+    double min, max;
+    cv::minMaxLoc(gray, &min, &max);
+    double filter = min+(max-min)/1.5;
+    cv::threshold(gray,mask,filter,255,cv::THRESH_BINARY);
+    
+    cv::erode(mask, mask, er_kernel_2);
+    cv::dilate(mask, mask, dil_kernel_2);
+    cv::dilate(mask, mask, dil_kernel_1);
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, clo_kernel);
+    
+    cv::imshow("",mask);
+    cv::waitKey(0);
 
     return true;
 }
@@ -196,9 +194,9 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     
     sift_->detectAndCompute(img,mask,keypoints,descriptors);
 
-    cv::Mat img_keypoints;
+    /*cv::Mat img_keypoints;
     cv::drawKeypoints(img, keypoints, img_keypoints, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT);
-    cv::imshow("SIFT Descriptors", img_keypoints);
+    cv::imshow("SIFT Descriptors", img_keypoints);*/
 
     matcher_.knnMatch(descriptors, matches, 2);
 
@@ -254,9 +252,19 @@ bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card)
         diffMask = mask.clone();
     } else {
         diffMask = mask - lastMask_;
+        /*for (int i=0; i<img.rows; i++)
+            for (int j=0; j<img.cols; j++)
+            {
+                if(mask.at<uchar>(i,j)==255 && diffMask.at<uchar>(i,j)==0)
+                if(img.at<cv::Vec3b>(i,j)!=residualImage_.at<cv::Vec3b>(i,j))
+                    diffMask.at<uchar>(i,j) = 255;
+            }*/
     }
     
-    cv::imshow("Difference Mask", diffMask);
+    cv::Mat diffImg = img-residualImage_;
+    //cv::imshow("Difference Mask", diffMask);
+    //cv::imshow("Difference Image", diffImg);
+    cv::waitKey(0);
 
     if(!findCardValue(img, diffMask, card))
         return false;

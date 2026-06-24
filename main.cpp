@@ -55,6 +55,8 @@ int main() {
             std::cout << "\n--- Round " << r << " (Leader: " << leaderName << ") ---" << std::endl;
 
             while (vfm.getNextInterestingFrame(frame)) {
+                cv::imshow("frame pre rec", frame);
+
                 if (watcher.recognize(frame, recognizedCard)) {
                     // La prima carta che vediamo in ogni round (solitamente) è la Briscola sul tavolo.
                     // Se non abbiamo ancora inizializzato la briscola ufficiale del game:
