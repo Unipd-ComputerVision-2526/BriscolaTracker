@@ -3,12 +3,12 @@
 
 Eye::Eye()
 {
-    cardMap_ = std::map<std::pair<Suit, int>, std::vector<cv::Mat>>();
+    //cardMap_ = std::map<std::pair<Suit, int>, std::vector<cv::Mat>>();
     recognizedCards_ = std::vector<std::pair<Suit, int>>();
     sift_ = cv::SIFT::create();
     
-    auto indexParams = cv::makePtr<cv::flann::LshIndexParams>(12,20,2);
-    auto searchParams = cv::makePtr<cv::flann::SearchParams>(50);
+    //auto indexParams = cv::makePtr<cv::flann::LshIndexParams>(12,20,2);
+    //auto searchParams = cv::makePtr<cv::flann::SearchParams>(50);
     matcher_ = cv::FlannBasedMatcher();
     //matcher_ = cv::FlannBasedMatcher(indexParams,searchParams);
 }
@@ -24,7 +24,7 @@ void Eye::reset()
 {
     clear();
     cardVector_.clear();
-    cardMap_.clear();
+    //cardMap_.clear();
 }
 
 void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
@@ -69,8 +69,7 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
 
     if (!validModelState())
     {
-        cardVector_.clear();
-        cardMap_.clear();
+        reset();
         throw std::invalid_argument("EyeError: dataset not usable for a Briscola match.");
     }
 }
@@ -96,7 +95,6 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
         return false;
 
     recognizedCards_.push_back(card);
-    std::cout<<"TROVATO "<<recognizedCards_.size()<<std::endl;
     return true;
 }
 
@@ -173,7 +171,7 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
     cv::cvtColor(gray, gray, cv::COLOR_BGR2GRAY);
     double min, max;
     cv::minMaxLoc(gray, &min, &max);
-    double filter = min+(max-min)/1.5;
+    double filter = min+(max-min)/1.3;
     cv::threshold(gray,mask,filter,255,cv::THRESH_BINARY);
     
     cv::erode(mask, mask, er_kernel_2);
@@ -194,13 +192,14 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     std::vector<int> matchCount(cardVector_.size());
     cv::Mat descriptors;
     float ratio = 0.75f;    //lowe's ratio
-    int imgIdx, maxIdx;
+    int imgIdx;
     
     sift_->detectAndCompute(img,mask,keypoints,descriptors);
 
     /*cv::Mat img_keypoints;
     cv::drawKeypoints(img, keypoints, img_keypoints, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT);
-    cv::imshow("SIFT Descriptors", img_keypoints);*/
+    cv::imshow("SIFT Descriptors", img_keypoints);
+    cv::waitKey(0);*/
 
     matcher_.knnMatch(descriptors, matches, 2);
 
@@ -235,7 +234,9 @@ bool Eye::recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card)
 
     cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
     if(!findCardPosition(rescaled, lastMask_))
+    {
         return false;
+    }
 
     cv::resize(lastMask_, lastMask_, cv::Size(lastMask_.cols*3, lastMask_.rows*3));
     if (!findCardValue(img, lastMask_, card))

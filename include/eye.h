@@ -33,7 +33,7 @@ class Eye
         // Recognized card with suit and value
         std::pair<Suit, int> card_;
         // Map that associates image descriptors and cards
-        std::map<std::pair<Suit, int>, std::vector<cv::Mat>> cardMap_;
+        // std::map<std::pair<Suit, int>, std::vector<cv::Mat>> cardMap_;
         // Vector that contains cards values used for training, useful for the matcher
         std::vector<std::pair<Suit, int>> cardVector_;
         // Already recognized cards
