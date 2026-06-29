@@ -156,30 +156,44 @@ void Eye::preprocessImage(const cv::Mat& img, cv::Mat& dst) {
     dst=preprocessed_img.clone();
 }
 
-bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
-{
-    cv::Mat gray;
-    cv::Mat er_kernel_1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
-    cv::Mat er_kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5));
-    cv::Mat dil_kernel_1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,31));
-    cv::Mat dil_kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(21,9));
-    cv::Mat clo_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15,15));
-    
-    cv::medianBlur(img,gray, 5);
-    cv::erode(gray, gray, er_kernel_1);
+bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
+    cv::Scalar mean, stddev;
+    cv::Mat hsv, z_score, mask_high_sat, mask_lights;
+    std::vector<cv::Mat> channels;
+    std::vector<std::vector<cv::Point>> contours;
 
-    cv::cvtColor(gray, gray, cv::COLOR_BGR2GRAY);
-    double min, max;
-    cv::minMaxLoc(gray, &min, &max);
-    double filter = min+(max-min)/1.3;
-    cv::threshold(gray,mask,filter,255,cv::THRESH_BINARY);
+    cv::Mat kernel_3    = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
+    cv::Mat kernel_7    = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+    cv::Mat kernel_11   = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11,11));
+
+    cv::cvtColor(img, hsv, cv::COLOR_BGR2HSV);
+    cv::split(hsv, channels);
+
+    cv::meanStdDev(channels[1],mean,stddev);
+    z_score = (channels[1]-mean)/stddev;
+    cv::threshold(z_score,mask_high_sat,0.85,255,cv::THRESH_BINARY);
+    cv::morphologyEx(mask_high_sat, mask_high_sat, cv::MORPH_OPEN, kernel_3);
+    cv::morphologyEx(mask_high_sat, mask_high_sat, cv::MORPH_CLOSE, kernel_11);
+
+    cv::meanStdDev(channels[2],mean,stddev);
+    cv::erode(channels[2], channels[2], kernel_3);
+    z_score = (channels[2]-mean)/stddev;
+    cv::threshold(z_score,mask_lights,0.97,255,cv::THRESH_BINARY);
+
+    mask_out = mask_lights+mask_high_sat;
     
-    cv::erode(mask, mask, er_kernel_2);
-    cv::dilate(mask, mask, dil_kernel_2);
-    cv::dilate(mask, mask, dil_kernel_1);
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, clo_kernel);
+    cv::findContours(mask_out,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+    mask_out = cv::Mat::zeros(mask_high_sat.size(), CV_8UC1);
+    for(int i=0; i<contours.size();i++)
+    {
+        if(cv::contourArea(contours[i])>800)
+        cv::drawContours(mask_out,contours, i, cv::Scalar(255), cv::FILLED);
+    }
+    cv::morphologyEx(mask_out, mask_out, cv::MORPH_CLOSE, kernel_7);
+    cv::erode(mask_out,mask_out,kernel_11);
+    cv::dilate(mask_out,mask_out,kernel_3);
     
-    if(cv::countNonZero(mask) < (img.rows*img.cols)*0.02)
+    if(cv::countNonZero(mask_out) < (img.rows*img.cols)*0.02)
         return false;
     return true;
 }
@@ -196,10 +210,13 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     
     sift_->detectAndCompute(img,mask,keypoints,descriptors);
 
-    /*cv::Mat img_keypoints;
+    /*
+    cv::Mat img_keypoints;
     cv::drawKeypoints(img, keypoints, img_keypoints, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT);
+    cv::namedWindow("SIFT Descriptors", cv::WINDOW_NORMAL);
     cv::imshow("SIFT Descriptors", img_keypoints);
-    cv::waitKey(0);*/
+    cv::waitKey(0);
+    //*/
 
     matcher_.knnMatch(descriptors, matches, 2);
 
@@ -246,7 +263,7 @@ bool Eye::recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card)
     return true;
 }
 
-bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card)
+bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& cards)
 {
     cv::Mat rescaled, mask, diffMask;
 
@@ -255,9 +272,11 @@ bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card)
     cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
     
     processMask(img, mask, diffMask);
+    
+    if(!findCardValue(img, diffMask, cards))
+        return false;
     lastMask_ = mask.clone();
-
-    return findCardValue(img, diffMask, card);
+    return true;
 }
 
 void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
@@ -266,8 +285,15 @@ void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
     if (lastMask_.empty() || residualImage_.empty()) {
         return;
     }
+
+    cv::Mat hsv_img, res_img_hsv;
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
+    cv::Mat kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5));
+    cv::cvtColor(img,hsv_img,cv::COLOR_BGR2HSV);
+    cv::cvtColor(residualImage_,res_img_hsv,cv::COLOR_BGR2HSV);
+    cv::GaussianBlur(res_img_hsv,res_img_hsv,cv::Size(5,5),0);
     
-    cv::Vec3b pix;
+    cv::Vec3b pix, img_pix, res_img_pix;
     uchar mask_pix;
     for(int i=0; i<mask.rows; i++)
     for(int j=0; j<mask.cols; j++)
@@ -277,20 +303,24 @@ void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
             continue;
         }
 
+        img_pix=hsv_img.at<cv::Vec3b>(i,j);
+        res_img_pix=res_img_hsv.at<cv::Vec3b>(i,j);
         mask_pix=mask.at<uchar>(i,j)-lastMask_.at<uchar>(i,j);
-        pix[0]=abs(img.at<cv::Vec3b>(i,j)[0]-residualImage_.at<cv::Vec3b>(i,j)[0]);
-        pix[1]=abs(img.at<cv::Vec3b>(i,j)[1]-residualImage_.at<cv::Vec3b>(i,j)[1]);
-        pix[2]=abs(img.at<cv::Vec3b>(i,j)[2]-residualImage_.at<cv::Vec3b>(i,j)[2]);
 
-        if(mask_pix==0 && cv::norm(pix,cv::NORM_L2) < 10)
+        pix[0]=abs(img_pix[0]-res_img_pix[0]);
+        pix[1]=abs(img_pix[1]-res_img_pix[1]);
+        pix[2]=abs(img_pix[2]-res_img_pix[2]);
+
+        if(mask_pix==0 && (pix[0]<35 || pix[1]<50))
         {
             dst.at<uchar>(i,j)=0;
         }
     }
 
-    if(cv::countNonZero(dst) < (img.rows*img.cols)*0.02)
+    if(cv::countNonZero(dst) < (img.rows*img.cols)*0.012)
         dst=cv::Mat::zeros(dst.size(),dst.type());
 
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
     cv::erode(dst,dst,kernel);
+    cv::dilate(dst,dst,kernel_2);
+    cv::morphologyEx(dst, dst, cv::MORPH_CLOSE, kernel_2);
 }

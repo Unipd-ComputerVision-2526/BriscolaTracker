@@ -51,7 +51,7 @@ class Eye
         void preprocessImage(const cv::Mat& img, cv::Mat& dst);
         void processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst);
         
-        bool findCardPosition(const cv::Mat& img, cv::Mat& mask);
+        bool findCardPosition(const cv::Mat& img, cv::Mat& mask_out);
         bool findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
         bool recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card);
         bool recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card);
