@@ -9,7 +9,7 @@ class Eye
 {
     public:
         // Constructor
-        Eye();
+        Eye(int channelNum=3);
         // Clear match
         void clear();
         // Clear also trained model
@@ -18,22 +18,18 @@ class Eye
         void fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset);
         // Recognize the card in an image, returns suit and value in the argument pair
         bool recognize(const cv::Mat& image, std::pair<Suit, int>& card);
-
-        bool hasBriscola() {return recognizedBriscola;};
-        void setBriscola(std::pair<Suit, int> b) { 
-            recognizedCards_.push_back(b); 
-            recognizedBriscola = true; 
-        }
-
-    private:
+        // Returns if the last  who played was Nord
+        bool wasNordActive() {return plN_;};
+        // Fills card with the last recognized card if present, else returns false
+        bool getLastCard(std::pair<Suit, int>& card);
+        
+        private:
         // Feature extractor
         cv::Ptr<cv::SIFT> sift_;
         // Feature Matcher
         cv::FlannBasedMatcher matcher_;
         // Recognized card with suit and value
         std::pair<Suit, int> card_;
-        // Map that associates image descriptors and cards
-        // std::map<std::pair<Suit, int>, std::vector<cv::Mat>> cardMap_;
         // Vector that contains cards values used for training, useful for the matcher
         std::vector<std::pair<Suit, int>> cardVector_;
         // Already recognized cards
@@ -42,19 +38,20 @@ class Eye
         cv::Mat lastMask_;
         // Last seen frame;
         cv::Mat residualImage_;
-
-        bool recognizedBriscola=false;
+        
+        int channelNum_;
+        bool plN_;
 
         bool isValidImage(const cv::Mat& img);
-        bool validModelState();
-
+        bool isValidModelState();
+        
         void preprocessImage(const cv::Mat& img, cv::Mat& dst);
         void processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst);
         
         bool findCardPosition(const cv::Mat& img, cv::Mat& mask_out);
         bool findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
-        bool recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card);
-        bool recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card);
+        bool recognizeCard(const cv::Mat& img, std::pair<Suit, int>& card, cv::Mat& diffMask);
+        bool isNordPlaying(const cv::Mat& img);
 };
 
 #endif
