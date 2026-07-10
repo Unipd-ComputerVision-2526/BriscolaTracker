@@ -81,3 +81,29 @@ briscola_final_project-_1_.txt
 
 notes/
 selected_frames/
+
+# Local debug & extracted samples
+extracted_samples/
+hough_debug/
+
+# Local standalone test binaries (compiled via g++)
+test_color_classifier
+test_contours_tuning
+test_denari_precision
+test_first_frame_g1r9
+test_spatiocolor_kmeans
+
+# Local experimental test & tuning sources
+src/denari_frame_extractor.cpp
+src/denari_picker.cpp
+src/dump_blobs.cpp
+src/test_contours_tuning.cpp
+src/test_denari_precision.cpp
+src/test_hough_coins.cpp
+src/test_spatiocolor_kmeans.cpp
+src/test_video_stats.cpp
+src/tune_denari.cpp
+test_color_classifier.cpp
+test_first_frame_g1r9.cpp
+test_yolo_api.py
+test_yolo_detector.cpp

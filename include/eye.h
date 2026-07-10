@@ -55,6 +55,14 @@ class Eye
         bool findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
         bool recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card);
         bool recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card);
+
+        // Fallback Template Matching
+        cv::Mat templLarge_;
+        cv::Mat templMedium_;
+        bool templatesLoaded_ = false;
+        
+        void loadTemplates();
+        int countDenari(const cv::Mat& img, const cv::Mat& mask);
 };
 
 #endif

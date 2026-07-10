@@ -56,6 +56,7 @@ int main() {
 
             while (vfm.getNextInterestingFrame(frame)) {
                 cv::imshow("frame pre rec", frame);
+                //cv::waitKey(0);
 
                 if (watcher.recognize(frame, recognizedCard)) {
                     // La prima carta che vediamo in ogni round (solitamente) è la Briscola sul tavolo.
