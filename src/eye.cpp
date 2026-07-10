@@ -1,22 +1,20 @@
 #include <eye.h>
-#include <iostream>
 
-Eye::Eye()
+Eye::Eye(int channelNum) : channelNum_(channelNum)
 {
-    //cardMap_ = std::map<std::pair<Suit, int>, std::vector<cv::Mat>>();
     recognizedCards_ = std::vector<std::pair<Suit, int>>();
     sift_ = cv::SIFT::create();
+    plN_=false;
+    matcher_ = cv::FlannBasedMatcher();
     
     //auto indexParams = cv::makePtr<cv::flann::LshIndexParams>(12,20,2);
     //auto searchParams = cv::makePtr<cv::flann::SearchParams>(50);
-    matcher_ = cv::FlannBasedMatcher();
     //matcher_ = cv::FlannBasedMatcher(indexParams,searchParams);
 }
 
 void Eye::clear()
 {
     recognizedCards_.clear();
-    recognizedBriscola = false;
     lastMask_ = cv::Mat();
 }
 
@@ -24,32 +22,26 @@ void Eye::reset()
 {
     clear();
     cardVector_.clear();
-    //cardMap_.clear();
 }
 
 void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
 {
-    std::vector<cv::Mat> channels;
-    std::vector<cv::Mat> trainReadyDesc;
     std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-    cv::Mat allDescriptors;
+    std::vector<cv::Mat> channels, trainReadyDesc;
+    cv::Mat descriptors, allDescriptors, img;
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset){
-        const cv::Mat& img = std::get<0>(card);
-        if(!isValidImage(img))
-            throw std::invalid_argument("EyeError: At least an image in the dataset has not the right file format. 3 channels images needed.");
+        if(!isValidImage(std::get<0>(card)))
+            throw std::invalid_argument("EyeError: At least an image in the dataset has not the right file format. "+std::to_string(channelNum_)+" channels images needed.");
     }
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset)
     {
         std::pair<Suit, int> p={std::get<1>(card), std::get<2>(card)};
-        const cv::Mat& original_img = std::get<0>(card);
-        cv::Mat img;
-        preprocessImage(original_img, img);
-
+        preprocessImage(std::get<0>(card), img);
         cv::split(img,channels);
-        for(int i=0;i<3;i++)
+
+        for(int i=0;i<channelNum_;i++)
         {
             sift_->detectAndCompute(channels[i], cv::noArray(), keypoints, descriptors);
             if(!descriptors.empty())
@@ -67,35 +59,40 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
     }
     matcher_.train();
 
-    if (!validModelState())
+    if (!isValidModelState())
     {
         reset();
-        throw std::invalid_argument("EyeError: dataset not usable for a Briscola match.");
+        throw std::invalid_argument("EyeError: Dataset not usable for a Briscola match.");
     }
 }
 
 bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
 {
-    bool result=true;
-    if (cardVector_.size()==0)
+    if (!isValidModelState())
         throw std::logic_error("EyeError: Attempt to call the model before training it.");
-    if (image.channels()!=3)
-        throw std::invalid_argument("EyeError: Only 3 channels frame used for feature detection.");
+    if (!isValidImage(image))
+        throw std::invalid_argument("EyeError: The image has not the right file format. "+std::to_string(channelNum_)+" channels images needed.");
     
-    if (recognizedCards_.size()==0 || !recognizedBriscola)
-        result = recognizeBriscola(image,card);
-    else
-        result = recognizeRoundCard(image,card);
+    cv::Mat diffMask;
 
-    residualImage_=image.clone();
+    if(recognizeCard(image,card,diffMask))
+    {
+        plN_=isNordPlaying(diffMask);
+        card_=card;
+        return true;
+    }
+    card=card_;
+    return false;
+}
 
-    if(!result)
-        return false;
-    if(std::count(recognizedCards_.begin(),recognizedCards_.end(),card)!=0)
-        return false;
-
-    recognizedCards_.push_back(card);
-    return true;
+bool Eye::getLastCard(std::pair<Suit, int>& card)
+{
+    if(!lastMask_.empty())
+    {
+        card=card_;
+        return true;
+    }
+    return false;
 }
 
 bool Eye::isValidImage(const cv::Mat& img){
@@ -105,13 +102,13 @@ bool Eye::isValidImage(const cv::Mat& img){
         return false;
     if (img.depth() != CV_8U && img.depth() != CV_16U && img.depth() != CV_32F)
         return false;
-    if (img.channels()!=3)
+    if (img.channels()!=channelNum_)
         return false;
     return true;
 }
 
-bool Eye::validModelState(){
-    if (cardVector_.size()<40)
+bool Eye::isValidModelState(){
+    if (cardVector_.size()!=40)
         return false;
 
     for (int suit=1; suit<5; suit++)
@@ -156,30 +153,44 @@ void Eye::preprocessImage(const cv::Mat& img, cv::Mat& dst) {
     dst=preprocessed_img.clone();
 }
 
-bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask)
-{
-    cv::Mat gray;
-    cv::Mat er_kernel_1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
-    cv::Mat er_kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5));
-    cv::Mat dil_kernel_1 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,31));
-    cv::Mat dil_kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(21,9));
-    cv::Mat clo_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15,15));
-    
-    cv::medianBlur(img,gray, 5);
-    cv::erode(gray, gray, er_kernel_1);
+bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
+    cv::Scalar mean, stddev;
+    cv::Mat hsv, z_score, mask_high_sat, mask_lights;
+    std::vector<cv::Mat> channels;
+    std::vector<std::vector<cv::Point>> contours;
 
-    cv::cvtColor(gray, gray, cv::COLOR_BGR2GRAY);
-    double min, max;
-    cv::minMaxLoc(gray, &min, &max);
-    double filter = min+(max-min)/1.3;
-    cv::threshold(gray,mask,filter,255,cv::THRESH_BINARY);
+    cv::Mat kernel_3    = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
+    cv::Mat kernel_7    = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
+    cv::Mat kernel_11   = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11,11));
+
+    cv::cvtColor(img, hsv, cv::COLOR_BGR2HSV);
+    cv::split(hsv, channels);
+
+    cv::meanStdDev(channels[1],mean,stddev);
+    z_score = (channels[1]-mean)/stddev;
+    cv::threshold(z_score,mask_high_sat,0.85,255,cv::THRESH_BINARY);
+    cv::morphologyEx(mask_high_sat, mask_high_sat, cv::MORPH_OPEN, kernel_3);
+    cv::morphologyEx(mask_high_sat, mask_high_sat, cv::MORPH_CLOSE, kernel_11);
+
+    cv::meanStdDev(channels[2],mean,stddev);
+    cv::erode(channels[2], channels[2], kernel_3);
+    z_score = (channels[2]-mean)/stddev;
+    cv::threshold(z_score,mask_lights,0.97,255,cv::THRESH_BINARY);
+
+    mask_out = mask_lights+mask_high_sat;
     
-    cv::erode(mask, mask, er_kernel_2);
-    cv::dilate(mask, mask, dil_kernel_2);
-    cv::dilate(mask, mask, dil_kernel_1);
-    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, clo_kernel);
+    cv::findContours(mask_out,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+    mask_out = cv::Mat::zeros(mask_high_sat.size(), CV_8UC1);
+    for(int i=0; i<contours.size();i++)
+    {
+        if(cv::contourArea(contours[i])>800)
+        cv::drawContours(mask_out,contours, i, cv::Scalar(255), cv::FILLED);
+    }
+    cv::morphologyEx(mask_out, mask_out, cv::MORPH_CLOSE, kernel_7);
+    cv::erode(mask_out,mask_out,kernel_11);
+    cv::dilate(mask_out,mask_out,kernel_3);
     
-    if(cv::countNonZero(mask) < (img.rows*img.cols)*0.02)
+    if(cv::countNonZero(mask_out) < (img.rows*img.cols)*0.02)
         return false;
     return true;
 }
@@ -195,12 +206,6 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     int imgIdx;
     
     sift_->detectAndCompute(img,mask,keypoints,descriptors);
-
-    /*cv::Mat img_keypoints;
-    cv::drawKeypoints(img, keypoints, img_keypoints, cv::Scalar::all(-1), cv::DrawMatchesFlags::DEFAULT);
-    cv::imshow("SIFT Descriptors", img_keypoints);
-    cv::waitKey(0);*/
-
     matcher_.knnMatch(descriptors, matches, 2);
 
     for(int i=0; i<matches.size();i++)
@@ -212,16 +217,8 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
         }
     }
 
-    for(int i=0; i<matchCount.size();i++) {
-        if (i > 0 && i % 10 == 0) std::cout << "| ";
-        std::cout<<matchCount[i]<<" ";
-    }
-    std::cout<<std::endl;
-
     maxCounts = std::max_element(matchCount.begin(),matchCount.end());
     imgIdx = std::distance(matchCount.begin(),maxCounts);
-    card = cardVector_[imgIdx];
-
     if(*maxCounts < 10) {
         if (!templatesLoaded_) loadTemplates();
         int denari = countDenari(img, mask);
@@ -232,40 +229,31 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
         }
         return false;
     }
+
+    card = cardVector_[imgIdx];
     std::cout<<"CARTA TROVATA (SIFT)"<<std::endl;
     return true;
 }
 
-bool Eye::recognizeBriscola(const cv::Mat& img, std::pair<Suit, int>& card)
+bool Eye::recognizeCard(const cv::Mat& img, std::pair<Suit, int>& card, cv::Mat& diffMask)
 {
-    cv::Mat rescaled;
+    cv::Mat rescaled, mask;
 
     cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
-    if(!findCardPosition(rescaled, lastMask_))
+    if(!findCardPosition(rescaled, mask))
     {
         return false;
     }
 
-    cv::resize(lastMask_, lastMask_, cv::Size(lastMask_.cols*3, lastMask_.rows*3));
-    if (!findCardValue(img, lastMask_, card))
+    cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
+    processMask(img, mask, diffMask);
+
+    if(!findCardValue(img, diffMask, card))
         return false;
 
-    recognizedBriscola=true;
-    return true;
-}
-
-bool Eye::recognizeRoundCard(const cv::Mat& img, std::pair<Suit, int>& card)
-{
-    cv::Mat rescaled, mask, diffMask;
-
-    cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
-    findCardPosition(rescaled, mask);
-    cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
-    
-    processMask(img, mask, diffMask);
+    residualImage_=img.clone();
     lastMask_ = mask.clone();
-
-    return findCardValue(img, diffMask, card);
+    return true;
 }
 
 void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
@@ -274,8 +262,15 @@ void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
     if (lastMask_.empty() || residualImage_.empty()) {
         return;
     }
+
+    cv::Mat hsv_img, res_img_hsv;
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
+    cv::Mat kernel_2 = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5));
+    cv::cvtColor(img,hsv_img,cv::COLOR_BGR2HSV);
+    cv::cvtColor(residualImage_,res_img_hsv,cv::COLOR_BGR2HSV);
+    cv::GaussianBlur(res_img_hsv,res_img_hsv,cv::Size(5,5),0);
     
-    cv::Vec3b pix;
+    cv::Vec3b pix, img_pix, res_img_pix;
     uchar mask_pix;
     for(int i=0; i<mask.rows; i++)
     for(int j=0; j<mask.cols; j++)
@@ -285,22 +280,37 @@ void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
             continue;
         }
 
+        img_pix=hsv_img.at<cv::Vec3b>(i,j);
+        res_img_pix=res_img_hsv.at<cv::Vec3b>(i,j);
         mask_pix=mask.at<uchar>(i,j)-lastMask_.at<uchar>(i,j);
-        pix[0]=abs(img.at<cv::Vec3b>(i,j)[0]-residualImage_.at<cv::Vec3b>(i,j)[0]);
-        pix[1]=abs(img.at<cv::Vec3b>(i,j)[1]-residualImage_.at<cv::Vec3b>(i,j)[1]);
-        pix[2]=abs(img.at<cv::Vec3b>(i,j)[2]-residualImage_.at<cv::Vec3b>(i,j)[2]);
 
-        if(mask_pix==0 && cv::norm(pix,cv::NORM_L2) < 10)
+        pix[0]=abs(img_pix[0]-res_img_pix[0]);
+        pix[1]=abs(img_pix[1]-res_img_pix[1]);
+        pix[2]=abs(img_pix[2]-res_img_pix[2]);
+
+        if(mask_pix==0 && (pix[0]<35 || pix[1]<50))
         {
             dst.at<uchar>(i,j)=0;
         }
     }
 
-    if(cv::countNonZero(dst) < (img.rows*img.cols)*0.02)
+    if(cv::countNonZero(dst) < (img.rows*img.cols)*0.012)
         dst=cv::Mat::zeros(dst.size(),dst.type());
 
-    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
     cv::erode(dst,dst,kernel);
+    cv::dilate(dst,dst,kernel_2);
+    cv::morphologyEx(dst, dst, cv::MORPH_CLOSE, kernel_2);
+
+    cv::Mat render;
+    img.copyTo(render,dst);
+}
+
+bool Eye::isNordPlaying(const cv::Mat& diffMask)
+{
+    int hh = diffMask.rows/2;
+    cv::Mat up=diffMask(cv::Rect(0, 0, diffMask.cols, hh));
+    cv::Mat bot=diffMask(cv::Rect(0, hh, diffMask.cols, diffMask.rows-hh));
+    return (cv::countNonZero(up)>cv::countNonZero(bot));
 }
 
 void Eye::loadTemplates() {
