@@ -15,17 +15,28 @@ std::string playerIdxToName(int idx) {
 
 int main(int argc, char* argv[]) {
     bool showDetailedStats = false;
+    bool verbose = false;
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "-stat") {
             showDetailedStats = true;
+        } else if (std::string(argv[i]) == "-verbose") {
+            verbose = true;
+        } else if (std::string(argv[i]) == "-help") {
+            std::cout << "Utilizzo: ./BriscolaTraker [OPZIONI]" << std::endl;
+            std::cout << "Opzioni:" << std::endl;
+            std::cout << "  -stat       Stampa la tabella dettagliata delle metriche dei semi." << std::endl;
+            std::cout << "  -verbose    Mostra log aggiuntivi e dettagli durante l'elaborazione." << std::endl;
+            std::cout << "  -version    Stampa la versione e il logo del progetto." << std::endl;
+            std::cout << "  -help       Mostra questo messaggio di aiuto." << std::endl;
+            return 0;
         } else if (std::string(argv[i]) == "-version") {
             std::cout << R"(
   ____       _               _      _______             _             
  |  _ \     (_)             | |    |__   __|           | |            
- | |_) |_ __ _ ___  ___ ___ | | __ _  | | _ __ __ _  __| | ___ _ __  
- |  _ <| '__| / __|/ __/ _ \| |/ _` | | || '__/ _` |/ _` |/ _ \ '__| 
- | |_) | |  | \__ \ (_| (_) | | (_| | | || | | (_| | (_| |  __/ |    
- |____/|_|  |_|___/\___\___/|_|\__,_| |_||_|  \__,_|\__,_|\___|_|    
+ | |_) |_ __ _ ___  ___ ___ | | __ _  | |_ __ __ _  ___| | _____ _ __ 
+ |  _ <| '__| / __|/ __/ _ \| |/ _` | | | '__/ _` |/ __| |/ / _ \ '__|
+ | |_) | |  | \__ \ (_| (_) | | (_| | | | | | (_| | (__|   <  __/ |   
+ |____/|_|  |_|___/\___\___/|_|\__,_| |_|_|  \__,_|\___|_|\_\___|_|   
                                                                       
 )" << '\n';
             std::cout << "BriscolaTracker v1.0" << std::endl;
@@ -40,7 +51,11 @@ int main(int argc, char* argv[]) {
         std::cerr << "Errore: Dataset non trovato in " << datasetPath << std::endl;
         return -1;
     }
-    std::cout << "Dataset caricato: " << dataset.size() << " carte." << std::endl;
+    if (verbose) {
+        std::cout << "[VERBOSE] Dataset caricato: " << dataset.size() << " carte totali per il template matching." << std::endl;
+    } else {
+        std::cout << "Dataset caricato: " << dataset.size() << " carte." << std::endl;
+    }
 
     Eye watcher;
     watcher.fit(dataset);
@@ -52,6 +67,10 @@ int main(int argc, char* argv[]) {
         std::cout << "\n========================================" << std::endl;
         std::cout << " ANALISI " << gameName << std::endl;
         std::cout << "========================================" << std::endl;
+        
+        if (verbose) {
+            std::cout << "[VERBOSE] Inizializzazione video per " << gameName << "..." << std::endl;
+        }
 
         Reporter reporter;
         Briscola* game = nullptr;
@@ -114,6 +133,9 @@ int main(int argc, char* argv[]) {
             }
 
             if (playedInRound.size() == 2) {
+                if (verbose) {
+                    std::cout << "[VERBOSE] Round " << r << " parse effettuato con successo (trovate 2 carte)." << std::endl;
+                }
                 RoundData data;
                 data.round = r;
                 data.briscolaNumber = briscolaNumber;
