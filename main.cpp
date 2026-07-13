@@ -25,6 +25,8 @@ int main() {
     Eye watcher;
     watcher.fit(dataset);
 
+    GameMetrics totalMetrics;
+
     for (int g = 1; g <= 4; ++g) {
         std::string gameName = "game" + std::to_string(g);
         std::cout << "\n========================================" << std::endl;
@@ -123,9 +125,47 @@ int main() {
             gtPath = "../dataset/" + gameName + "resultsCORRECTED 2.csv";
         }
         std::cout << "\n>>> FINE ANALISI " << gameName << ". Risultati finali:" << std::endl;
-        reporter.calculateMetrics(gtPath);
+        GameMetrics gm = reporter.calculateMetrics(gtPath);
+        totalMetrics.add(gm);
         
         if (game) { delete game; game = nullptr; }
+    }
+
+    auto formatPct = [](int count, int total) {
+        if (total == 0) return std::string("-");
+        double pct = (static_cast<double>(count) / total) * 100.0;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d (%.1f%%)", count, pct);
+        return std::string(buf);
+    };
+
+    std::cout << "\n========================================" << std::endl;
+    std::cout << " RISULTATI GLOBALI (TUTTI I GAME)" << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Card Recognition Accuracy: " << (totalMetrics.expectedCards > 0 ? (static_cast<double>(totalMetrics.correctCards) / totalMetrics.expectedCards) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Player Identification Accuracy: " << (totalMetrics.totalPlayers > 0 ? (static_cast<double>(totalMetrics.correctPlayers) / totalMetrics.totalPlayers) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Briscola Recognition Accuracy: " << (totalMetrics.expectedBriscola > 0 ? (static_cast<double>(totalMetrics.correctBriscola) / totalMetrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Rounds Evaluated: " << totalMetrics.totalEvaluated << " / " << totalMetrics.expectedBriscola << std::endl;
+
+    std::cout << "\n--- DETAILED SUIT METRICS (GLOBAL) ---\n";
+    std::cout << std::left << std::setw(10) << "SUIT" 
+              << std::setw(12) << "EXPECTED"
+              << std::setw(20) << "EXACT MATCH"
+              << std::setw(20) << "CORRECT SUIT"
+              << std::setw(20) << "WRONG SUIT"
+              << std::setw(20) << "INCOMPLETE ROUND"
+              << std::endl;
+
+    std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
+    for (int i = 1; i <= 4; ++i) {
+        const auto& sm = totalMetrics.suits[i];
+        std::cout << std::left << std::setw(10) << suitNames[i]
+                  << std::setw(12) << sm.expected
+                  << std::setw(20) << formatPct(sm.exactMatch, sm.expected)
+                  << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
+                  << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
+                  << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
+                  << std::endl;
     }
 
     return 0;

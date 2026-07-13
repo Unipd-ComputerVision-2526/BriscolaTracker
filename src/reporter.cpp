@@ -87,9 +87,13 @@ void Reporter::generateFinalReport(const std::string& filename, int totalNorth, 
     file.close();
 }
 
-void Reporter::calculateMetrics(const std::string& groundTruthPath) const {
+GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath) const {
+    GameMetrics metrics;
+
     std::ifstream file(groundTruthPath);
-    if (!checkStream(file, groundTruthPath)) return;
+    if (!checkStream(file, groundTruthPath)) {
+        return metrics;
+    }
 
     auto safeStoi = [](const std::string& s) {
         if (s.empty()) return 0;
@@ -121,30 +125,91 @@ void Reporter::calculateMetrics(const std::string& groundTruthPath) const {
         gt.push_back(r);
     }
 
-    int correctCards = 0, correctPlayers = 0, correctBriscola = 0;
-    int totalEvaluated = 0;
+    metrics.expectedBriscola = gt.size();
 
-    for (const auto& loggedRound : history_) {
-        // Find matching round in ground truth
-        auto it = std::find_if(gt.begin(), gt.end(), [&loggedRound](const RoundData& g) {
-            return g.round == loggedRound.round;
+    for (const auto& gtRound : gt) {
+        metrics.suits[gtRound.northSuit].expected++;
+        metrics.suits[gtRound.southSuit].expected++;
+        metrics.expectedCards += 2;
+        metrics.totalPlayers += 2;
+
+        auto it = std::find_if(history_.begin(), history_.end(), [&gtRound](const RoundData& h) {
+            return h.round == gtRound.round;
         });
 
-        if (it != gt.end()) {
-            totalEvaluated++;
-            if (loggedRound.northNumber == it->northNumber && loggedRound.northSuit == it->northSuit) correctCards++;
-            if (loggedRound.southNumber == it->southNumber && loggedRound.southSuit == it->southSuit) correctCards++;
-            if (loggedRound.leader == it->leader) correctPlayers++;
-            if (loggedRound.winner == it->winner) correctPlayers++;
-            if (loggedRound.briscolaNumber == it->briscolaNumber && loggedRound.briscolaSuit == it->briscolaSuit) correctBriscola++;
+        if (it != history_.end()) {
+            metrics.totalEvaluated++;
+            
+            // Check North
+            if (it->northSuit == gtRound.northSuit) {
+                if (it->northNumber == gtRound.northNumber) {
+                    metrics.suits[gtRound.northSuit].exactMatch++;
+                    metrics.correctCards++;
+                } else {
+                    metrics.suits[gtRound.northSuit].correctSuit++;
+                }
+            } else {
+                metrics.suits[gtRound.northSuit].wrongSuit++;
+            }
+
+            // Check South
+            if (it->southSuit == gtRound.southSuit) {
+                if (it->southNumber == gtRound.southNumber) {
+                    metrics.suits[gtRound.southSuit].exactMatch++;
+                    metrics.correctCards++;
+                } else {
+                    metrics.suits[gtRound.southSuit].correctSuit++;
+                }
+            } else {
+                metrics.suits[gtRound.southSuit].wrongSuit++;
+            }
+
+            if (it->leader == gtRound.leader) metrics.correctPlayers++;
+            if (it->winner == gtRound.winner) metrics.correctPlayers++;
+            if (it->briscolaNumber == gtRound.briscolaNumber && it->briscolaSuit == gtRound.briscolaSuit) {
+                metrics.correctBriscola++;
+            }
+        } else {
+            // Round missing from history_
+            metrics.suits[gtRound.northSuit].incompleteRound++;
+            metrics.suits[gtRound.southSuit].incompleteRound++;
         }
     }
 
+    auto formatPct = [](int count, int total) {
+        if (total == 0) return std::string("-");
+        double pct = (static_cast<double>(count) / total) * 100.0;
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d (%.1f%%)", count, pct);
+        return std::string(buf);
+    };
+
     std::cout << "\n--- PERFORMANCE METRICS ---" << std::endl;
-    // We expect exactly 40 cards across 20 rounds, and 40 player ID validations.
-    // If some rounds are missing, they count as wrong (hence dividing by 40.0)
-    std::cout << "Card Recognition Accuracy: " << (static_cast<double>(correctCards) / 40.0) * 100.0 << "%" << std::endl;
-    std::cout << "Player Identification Accuracy: " << (static_cast<double>(correctPlayers) / 40.0) * 100.0 << "%" << std::endl;
-    std::cout << "Briscola Recognition Accuracy: " << (static_cast<double>(correctBriscola) / 20.0) * 100.0 << "%" << std::endl;
-    std::cout << "Rounds Evaluated: " << totalEvaluated << " / 20" << std::endl;
+    std::cout << "Card Recognition Accuracy: " << (metrics.expectedCards > 0 ? (static_cast<double>(metrics.correctCards) / metrics.expectedCards) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Player Identification Accuracy: " << (metrics.totalPlayers > 0 ? (static_cast<double>(metrics.correctPlayers) / metrics.totalPlayers) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Briscola Recognition Accuracy: " << (metrics.expectedBriscola > 0 ? (static_cast<double>(metrics.correctBriscola) / metrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Rounds Evaluated: " << metrics.totalEvaluated << " / " << metrics.expectedBriscola << std::endl;
+
+    std::cout << "\n--- DETAILED SUIT METRICS ---\n";
+    std::cout << std::left << std::setw(10) << "SUIT" 
+              << std::setw(12) << "EXPECTED"
+              << std::setw(20) << "EXACT MATCH"
+              << std::setw(20) << "CORRECT SUIT"
+              << std::setw(20) << "WRONG SUIT"
+              << std::setw(20) << "INCOMPLETE ROUND"
+              << std::endl;
+
+    std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
+    for (int i = 1; i <= 4; ++i) {
+        const auto& sm = metrics.suits[i];
+        std::cout << std::left << std::setw(10) << suitNames[i]
+                  << std::setw(12) << sm.expected
+                  << std::setw(20) << formatPct(sm.exactMatch, sm.expected)
+                  << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
+                  << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
+                  << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
+                  << std::endl;
+    }
+
+    return metrics;
 }
