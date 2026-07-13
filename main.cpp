@@ -47,6 +47,7 @@ int main() {
             cv::Mat frame;
             std::pair<Suit, int> recognizedCard;
             std::vector<std::pair<Suit, int>> playedInRound;
+            std::vector<bool> playerOfCard;
 
             // Determiniamo chi dovrebbe iniziare secondo la logica di gioco
             int leaderIdx = (game == nullptr) ? 0 : game->getNextFirstPlayer();
@@ -55,8 +56,8 @@ int main() {
             std::cout << "\n--- Round " << r << " (Leader: " << leaderName << ") ---" << std::endl;
 
             while (vfm.getNextInterestingFrame(frame)) {
-                cv::imshow("frame pre rec", frame);
-                //cv::waitKey(0);
+                // cv::imshow("frame pre rec", frame);
+                // cv::waitKey(0);
 
                 if (watcher.recognize(frame, recognizedCard)) {
                     // La prima carta che vediamo in ogni round (solitamente) è la Briscola sul tavolo.
@@ -78,7 +79,11 @@ int main() {
                     }
 
                     // Se arriviamo qui, è una carta giocata dai player
+                    bool isNord = watcher.wasNordActive();
+                    if (!playerOfCard.empty() && playerOfCard.back() == isNord) continue; // Salta i duplicati dello stesso player
+
                     playedInRound.push_back(recognizedCard);
+                    playerOfCard.push_back(isNord);
                     game->addCardToRound(recognizedCard.first, recognizedCard.second);
                     std::cout << "Riconosciuta carta " << playedInRound.size() << ": " << recognizedCard.second << " di " << recognizedCard.first << std::endl;
                     
@@ -93,12 +98,12 @@ int main() {
                 data.briscolaSuit = briscolaSuit;
                 data.leader = leaderName;
                 
-                if (leaderIdx == 0) { // North led
-                    data.northNumber = playedInRound[0].second; data.northSuit = playedInRound[0].first;
-                    data.southNumber = playedInRound[1].second; data.southSuit = playedInRound[1].first;
-                } else { // South led
-                    data.southNumber = playedInRound[0].second; data.southSuit = playedInRound[0].first;
-                    data.northNumber = playedInRound[1].second; data.northSuit = playedInRound[1].first;
+                for (size_t i = 0; i < 2; ++i) {
+                    if (playerOfCard[i]) {
+                        data.northNumber = playedInRound[i].second; data.northSuit = playedInRound[i].first;
+                    } else {
+                        data.southNumber = playedInRound[i].second; data.southSuit = playedInRound[i].first;
+                    }
                 }
 
                 // Chi vince inizia il prossimo round (estratto dall'oggetto game aggiornato)
@@ -113,7 +118,10 @@ int main() {
             }
         }
 
-        std::string gtPath = "../dataset/" + gameName + "results.csv";
+        std::string gtPath = "../dataset/" + gameName + "resultsCORRECTED.csv";
+        if (g == 2) {
+            gtPath = "../dataset/" + gameName + "resultsCORRECTED 2.csv";
+        }
         std::cout << "\n>>> FINE ANALISI " << gameName << ". Risultati finali:" << std::endl;
         reporter.calculateMetrics(gtPath);
         

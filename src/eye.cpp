@@ -348,6 +348,11 @@ int Eye::countDenari(const cv::Mat& img, const cv::Mat& mask) {
     cv::Mat imgROI = img(roi);
     cv::Mat maskROI = mask(roi);
 
+    // Erodiamo la maschera per eliminare le ombre sottili e frammentate
+    // sulla Briscola statica. La vera carta in movimento è un blob solido.
+    cv::Mat solidMask;
+    cv::erode(maskROI, solidMask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(21, 21)));
+
     std::vector<cv::Mat> templates = {templLarge_, templMedium_};
     
     struct Detection { cv::Rect rect; double score; };
@@ -379,10 +384,10 @@ int Eye::countDenari(const cv::Mat& img, const cv::Mat& mask) {
                 cv::minMaxLoc(resultThresh, nullptr, &maxVal, nullptr, &maxLoc);
                 if (maxVal < thresholdScore) break;
 
-                // Controllo: il centro del template trovato cade dentro la mask fornita da Eye?
-                // Se sì, è una moneta sulla carta, non sulla tovaglia o sfondo.
+                // Controllo: il centro del template cade nella zona *solida* della maschera di movimento?
+                // Le ombre sulla Briscola statica verranno scartate perché distrutte dall'erosione.
                 cv::Point center(maxLoc.x + resizedTempl.cols/2, maxLoc.y + resizedTempl.rows/2);
-                if (maskROI.at<uchar>(center.y, center.x) > 128) {
+                if (solidMask.at<uchar>(center.y, center.x) > 128) {
                     all_detections.push_back({cv::Rect(roi.x + maxLoc.x, roi.y + maxLoc.y, resizedTempl.cols, resizedTempl.rows), maxVal});
                 }
 
