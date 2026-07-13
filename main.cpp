@@ -13,7 +13,13 @@ std::string playerIdxToName(int idx) {
     return (idx == 0) ? "North" : "South";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    bool showDetailedStats = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "-stat") {
+            showDetailedStats = true;
+        }
+    }
     std::string datasetPath = "../dataset/Briscola_Trentine";
     std::vector<std::tuple<cv::Mat, Suit, int>> dataset = loadDataset(datasetPath);
     if (dataset.empty()) {
@@ -125,7 +131,7 @@ int main() {
             gtPath = "../dataset/" + gameName + "resultsCORRECTED 2.csv";
         }
         std::cout << "\n>>> FINE ANALISI " << gameName << ". Risultati finali:" << std::endl;
-        GameMetrics gm = reporter.calculateMetrics(gtPath);
+        GameMetrics gm = reporter.calculateMetrics(gtPath, showDetailedStats);
         totalMetrics.add(gm);
         
         if (game) { delete game; game = nullptr; }
@@ -147,25 +153,27 @@ int main() {
     std::cout << "Briscola Recognition Accuracy: " << (totalMetrics.expectedBriscola > 0 ? (static_cast<double>(totalMetrics.correctBriscola) / totalMetrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
     std::cout << "Rounds Evaluated: " << totalMetrics.totalEvaluated << " / " << totalMetrics.expectedBriscola << std::endl;
 
-    std::cout << "\n--- DETAILED SUIT METRICS (GLOBAL) ---\n";
-    std::cout << std::left << std::setw(10) << "SUIT" 
-              << std::setw(15) << "totale atteso"
-              << std::setw(20) << "Seme corretto"
-              << std::setw(25) << "Seme + Numero esatti"
-              << std::setw(20) << "Seme errato"
-              << std::setw(20) << "Round incompleto"
-              << std::endl;
-
-    std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
-    for (int i = 1; i <= 4; ++i) {
-        const auto& sm = totalMetrics.suits[i];
-        std::cout << std::left << std::setw(10) << suitNames[i]
-                  << std::setw(15) << sm.expected
-                  << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
-                  << std::setw(25) << formatPct(sm.exactMatch, sm.expected)
-                  << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
-                  << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
+    if (showDetailedStats) {
+        std::cout << "\n--- DETAILED SUIT METRICS (GLOBAL) ---\n";
+        std::cout << std::left << std::setw(10) << "SUIT" 
+                  << std::setw(15) << "totale atteso"
+                  << std::setw(20) << "Seme corretto"
+                  << std::setw(25) << "Seme + Numero esatti"
+                  << std::setw(20) << "Seme errato"
+                  << std::setw(20) << "Round incompleto"
                   << std::endl;
+
+        std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
+        for (int i = 1; i <= 4; ++i) {
+            const auto& sm = totalMetrics.suits[i];
+            std::cout << std::left << std::setw(10) << suitNames[i]
+                      << std::setw(15) << sm.expected
+                      << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
+                      << std::setw(25) << formatPct(sm.exactMatch, sm.expected)
+                      << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
+                      << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
+                      << std::endl;
+        }
     }
 
     return 0;

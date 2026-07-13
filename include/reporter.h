@@ -66,7 +66,7 @@ public:
     void logRound(const RoundData& data);
     void exportCSV(const std::string& filename) const;
     void generateFinalReport(const std::string& filename, int totalNorth, int totalSouth) const;
-    GameMetrics calculateMetrics(const std::string& groundTruthPath) const;
+    GameMetrics calculateMetrics(const std::string& groundTruthPath, bool showDetailedStats = false) const;
 
 private:
     std::vector<RoundData> history_;

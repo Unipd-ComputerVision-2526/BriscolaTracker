@@ -87,7 +87,7 @@ void Reporter::generateFinalReport(const std::string& filename, int totalNorth, 
     file.close();
 }
 
-GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath) const {
+GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath, bool showDetailedStats) const {
     GameMetrics metrics;
 
     std::ifstream file(groundTruthPath);
@@ -188,25 +188,27 @@ GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath) const
     std::cout << "Briscola Recognition Accuracy: " << (metrics.expectedBriscola > 0 ? (static_cast<double>(metrics.correctBriscola) / metrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
     std::cout << "Rounds Evaluated: " << metrics.totalEvaluated << " / " << metrics.expectedBriscola << std::endl;
 
-    std::cout << "\n--- DETAILED SUIT METRICS ---\n";
-    std::cout << std::left << std::setw(10) << "SUIT" 
-              << std::setw(15) << "totale atteso"
-              << std::setw(20) << "Seme corretto"
-              << std::setw(25) << "Seme + Numero esatti"
-              << std::setw(20) << "Seme errato"
-              << std::setw(20) << "Round incompleto"
-              << std::endl;
-
-    std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
-    for (int i = 1; i <= 4; ++i) {
-        const auto& sm = metrics.suits[i];
-        std::cout << std::left << std::setw(10) << suitNames[i]
-                  << std::setw(15) << sm.expected
-                  << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
-                  << std::setw(25) << formatPct(sm.exactMatch, sm.expected)
-                  << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
-                  << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
+    if (showDetailedStats) {
+        std::cout << "\n--- DETAILED SUIT METRICS ---\n";
+        std::cout << std::left << std::setw(10) << "SUIT" 
+                  << std::setw(15) << "totale atteso"
+                  << std::setw(20) << "Seme corretto"
+                  << std::setw(25) << "Seme + Numero esatti"
+                  << std::setw(20) << "Seme errato"
+                  << std::setw(20) << "Round incompleto"
                   << std::endl;
+
+        std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
+        for (int i = 1; i <= 4; ++i) {
+            const auto& sm = metrics.suits[i];
+            std::cout << std::left << std::setw(10) << suitNames[i]
+                      << std::setw(15) << sm.expected
+                      << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
+                      << std::setw(25) << formatPct(sm.exactMatch, sm.expected)
+                      << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
+                      << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
+                      << std::endl;
+        }
     }
 
     return metrics;
