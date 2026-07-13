@@ -142,11 +142,10 @@ GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath) const
             
             // Check North
             if (it->northSuit == gtRound.northSuit) {
+                metrics.suits[gtRound.northSuit].correctSuit++;
                 if (it->northNumber == gtRound.northNumber) {
                     metrics.suits[gtRound.northSuit].exactMatch++;
                     metrics.correctCards++;
-                } else {
-                    metrics.suits[gtRound.northSuit].correctSuit++;
                 }
             } else {
                 metrics.suits[gtRound.northSuit].wrongSuit++;
@@ -154,11 +153,10 @@ GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath) const
 
             // Check South
             if (it->southSuit == gtRound.southSuit) {
+                metrics.suits[gtRound.southSuit].correctSuit++;
                 if (it->southNumber == gtRound.southNumber) {
                     metrics.suits[gtRound.southSuit].exactMatch++;
                     metrics.correctCards++;
-                } else {
-                    metrics.suits[gtRound.southSuit].correctSuit++;
                 }
             } else {
                 metrics.suits[gtRound.southSuit].wrongSuit++;
