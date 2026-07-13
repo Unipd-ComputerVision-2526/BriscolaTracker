@@ -149,20 +149,20 @@ int main() {
 
     std::cout << "\n--- DETAILED SUIT METRICS (GLOBAL) ---\n";
     std::cout << std::left << std::setw(10) << "SUIT" 
-              << std::setw(12) << "EXPECTED"
-              << std::setw(20) << "EXACT MATCH"
-              << std::setw(20) << "CORRECT SUIT"
-              << std::setw(20) << "WRONG SUIT"
-              << std::setw(20) << "INCOMPLETE ROUND"
+              << std::setw(15) << "totale atteso"
+              << std::setw(20) << "Seme corretto"
+              << std::setw(25) << "Seme + Numero esatti"
+              << std::setw(20) << "Seme errato"
+              << std::setw(20) << "Round incompleto"
               << std::endl;
 
     std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
     for (int i = 1; i <= 4; ++i) {
         const auto& sm = totalMetrics.suits[i];
         std::cout << std::left << std::setw(10) << suitNames[i]
-                  << std::setw(12) << sm.expected
-                  << std::setw(20) << formatPct(sm.exactMatch, sm.expected)
+                  << std::setw(15) << sm.expected
                   << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
+                  << std::setw(25) << formatPct(sm.exactMatch, sm.expected)
                   << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
                   << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
                   << std::endl;
