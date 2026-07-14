@@ -169,9 +169,6 @@ void Reporter::evaluateMatchedRound(const RoundData& detected, const RoundData& 
 
     if (detected.leader == gtRound.leader) metrics.correctPlayers++;
     if (detected.winner == gtRound.winner) metrics.correctPlayers++;
-    if (detected.briscolaNumber == gtRound.briscolaNumber && detected.briscolaSuit == gtRound.briscolaSuit) {
-        metrics.correctBriscola++;
-    }
 }
 
 void Reporter::markIncompleteRound(const RoundData& gtRound, GameMetrics& metrics) const {
@@ -184,7 +181,8 @@ void Reporter::printMetricsReport(const GameMetrics& metrics, bool showDetailedS
     std::cout << "Card Recognition Accuracy: " << (metrics.expectedCards > 0 ? (static_cast<double>(metrics.correctCards) / metrics.expectedCards) * 100.0 : 0.0) << "%" << std::endl;
     std::cout << "Player Identification Accuracy: " << (metrics.totalPlayers > 0 ? (static_cast<double>(metrics.correctPlayers) / metrics.totalPlayers) * 100.0 : 0.0) << "%" << std::endl;
     std::cout << "Briscola Recognition Accuracy: " << (metrics.expectedBriscola > 0 ? (static_cast<double>(metrics.correctBriscola) / metrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
-    std::cout << "Rounds Evaluated: " << metrics.totalEvaluated << " / " << metrics.expectedBriscola << std::endl;
+    std::cout << "Game Result Accuracy: " << (metrics.expectedResultFields > 0 ? (static_cast<double>(metrics.correctResultFields) / metrics.expectedResultFields) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Rounds Evaluated: " << metrics.totalEvaluated << " / " << (metrics.expectedCards / 2) << std::endl;
 
     if (showDetailedStats) {
         std::cout << "\n--- DETAILED SUIT METRICS ---\n";
@@ -220,7 +218,7 @@ GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath, bool 
 
     std::vector<RoundData> gt = parseGroundTruth(file);
 
-    metrics.expectedBriscola = gt.size();
+    metrics.expectedBriscola = 1;
 
     for (const auto& gtRound : gt) {
         updateExpectedMetrics(metrics, gtRound);
@@ -235,6 +233,38 @@ GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath, bool 
             markIncompleteRound(gtRound, metrics);
         }
     }
+
+    // --- BRISCOLA RECOGNITION ACCURACY ---
+    if (!history_.empty() && !gt.empty()) {
+        if (history_[0].briscolaNumber == gt[0].briscolaNumber && history_[0].briscolaSuit == gt[0].briscolaSuit) {
+            metrics.correctBriscola = 1;
+        } else {
+            metrics.correctBriscola = 0;
+        }
+    } else {
+        metrics.correctBriscola = 0;
+    }
+
+    // --- GAME RESULT ACCURACY ---
+    int gtNorthPts = 0, gtSouthPts = 0;
+    for (const auto& r : gt) {
+        if (r.winner == "North") gtNorthPts += r.points;
+        else if (r.winner == "South") gtSouthPts += r.points;
+    }
+    std::string gtWinner = gtNorthPts > gtSouthPts ? "North" : (gtSouthPts > gtNorthPts ? "South" : "Draw");
+
+    int detNorthPts = 0, detSouthPts = 0;
+    for (const auto& r : history_) {
+        if (r.winner == "North") detNorthPts += r.points;
+        else if (r.winner == "South") detSouthPts += r.points;
+    }
+    std::string detWinner = detNorthPts > detSouthPts ? "North" : (detSouthPts > detNorthPts ? "South" : "Draw");
+
+    metrics.correctResultFields = 0;
+    metrics.expectedResultFields = 3;
+    if (detNorthPts == gtNorthPts) metrics.correctResultFields++;
+    if (detSouthPts == gtSouthPts) metrics.correctResultFields++;
+    if (detWinner == gtWinner) metrics.correctResultFields++;
 
     printMetricsReport(metrics, showDetailedStats);
 

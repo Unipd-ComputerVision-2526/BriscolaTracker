@@ -71,10 +71,14 @@ struct GameMetrics {
     int totalEvaluated = 0;
     /** @brief Total expected card comparisons. */
     int expectedCards = 0;
-    /** @brief Briscola evaluation denominator (initialized to 20, then set from ground truth size). */
-    int expectedBriscola = 20; // Default 20 rounds
+    /** @brief Briscola evaluation denominator. */
+    int expectedBriscola = 1; 
     /** @brief Player accuracy denominator accumulator used during metric computation. */
     int totalPlayers = 40;
+    /** @brief Number of correct game result fields. */
+    int correctResultFields = 0;
+    /** @brief Total expected game result fields. */
+    int expectedResultFields = 3;
 
     /**
      * @brief Accumulates another metrics object into this one.
@@ -95,6 +99,8 @@ struct GameMetrics {
         expectedCards += other.expectedCards;
         expectedBriscola += other.expectedBriscola;
         totalPlayers += other.totalPlayers;
+        correctResultFields += other.correctResultFields;
+        expectedResultFields += other.expectedResultFields;
     }
 };
 
