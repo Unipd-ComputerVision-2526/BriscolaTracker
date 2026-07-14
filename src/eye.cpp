@@ -212,10 +212,7 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
 bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
 {
     cv::Mat img_proc;
-    cv::imshow("pre preprocess", img);
     preprocessImage(img,img_proc);
-    cv::imshow("post preprocess", img_proc);
-    cv::waitKey(0);
 
     bool result=siftRecognition(img_proc, mask, card);
     if(!result){
@@ -387,24 +384,3 @@ bool Eye::akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, in
     card = cardVector_[imgIdx];
     return true;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*cv::Mat image_with_features;
-    cv::namedWindow("AKAZE Features frame", cv::WINDOW_NORMAL);
-    cv::drawKeypoints(img, keypoints, image_with_features, cv::Scalar::all(-1), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-    cv::imshow("AKAZE Features frame", image_with_features);
-    cv::resizeWindow("AKAZE Features frame",cv::Size(400,700));*/
