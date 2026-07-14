@@ -5,6 +5,10 @@
 #include <iomanip>
 #include <algorithm>
 
+void Reporter::clear() {
+    history_.clear();
+}
+
 void Reporter::logRound(const RoundData& data) {
     history_.push_back(data);
 }

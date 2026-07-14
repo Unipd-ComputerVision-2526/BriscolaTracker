@@ -32,6 +32,8 @@ public:
     void generateFinalReport(const std::string& filename, int totalNorth, int totalSouth) const;
     void calculateMetrics(const std::string& groundTruthPath) const;
 
+    void clear();
+
 private:
     std::vector<RoundData> history_;
 
