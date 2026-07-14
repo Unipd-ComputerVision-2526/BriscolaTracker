@@ -26,8 +26,10 @@ class Eye
         private:
         // Feature extractor
         cv::Ptr<cv::SIFT> sift_;
+        cv::Ptr<cv::AKAZE> akaze_;
         // Feature Matcher
         cv::FlannBasedMatcher matcher_;
+        cv::BFMatcher bf_matcher_;
         // Recognized card with suit and value
         std::pair<Suit, int> card_;
         // Vector that contains cards values used for training, useful for the matcher
@@ -52,6 +54,9 @@ class Eye
         bool findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
         bool recognizeCard(const cv::Mat& img, std::pair<Suit, int>& card, cv::Mat& diffMask);
         bool isNordPlaying(const cv::Mat& img);
+
+        bool siftRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
+        bool akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
 };
 
 #endif

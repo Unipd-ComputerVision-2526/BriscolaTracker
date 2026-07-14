@@ -4,12 +4,15 @@ Eye::Eye(int channelNum) : channelNum_(channelNum)
 {
     recognizedCards_ = std::vector<std::pair<Suit, int>>();
     sift_ = cv::SIFT::create();
+    akaze_ = cv::AKAZE::create();
     plN_=false;
     matcher_ = cv::FlannBasedMatcher();
     
-    //auto indexParams = cv::makePtr<cv::flann::LshIndexParams>(12,20,2);
-    //auto searchParams = cv::makePtr<cv::flann::SearchParams>(50);
+    auto indexParams = cv::makePtr<cv::flann::LshIndexParams>(12,20,2);
+    auto searchParams = cv::makePtr<cv::flann::SearchParams>(50);
     //matcher_ = cv::FlannBasedMatcher(indexParams,searchParams);
+    bf_matcher_ = cv::BFMatcher(cv::NORM_HAMMING2);
+    //bf_matcher_ = cv::BFMatcher();
 }
 
 void Eye::clear()
@@ -28,7 +31,7 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
 {
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::Mat> channels, trainReadyDesc;
-    cv::Mat descriptors, allDescriptors, img;
+    cv::Mat descriptors, si_all_descriptors, ak_all_descriptors, img;
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset){
         if(!isValidImage(std::get<0>(card)))
@@ -39,23 +42,34 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
     {
         std::pair<Suit, int> p={std::get<1>(card), std::get<2>(card)};
         preprocessImage(std::get<0>(card), img);
+
+        sift_->detectAndCompute(img, cv::noArray(), keypoints, descriptors);
+        if(!descriptors.empty())
+            si_all_descriptors.push_back(descriptors);
+        descriptors.release();
+
+        cv::cvtColor(img,img,cv::COLOR_BGR2Lab);
         cv::split(img,channels);
 
-        for(int i=0;i<channelNum_;i++)
+        for(int i=1;i<=2;i++)
         {
-            sift_->detectAndCompute(channels[i], cv::noArray(), keypoints, descriptors);
+            akaze_->detectAndCompute(channels[i], cv::noArray(), keypoints, descriptors);
             if(!descriptors.empty())
-                allDescriptors.push_back(descriptors);
+                ak_all_descriptors.push_back(descriptors);
             descriptors.release();
         }
 
-        allDescriptors.convertTo(allDescriptors,CV_32F);
-        trainReadyDesc = {allDescriptors};
+        trainReadyDesc = {si_all_descriptors};
         matcher_.add(trainReadyDesc);
+
+        trainReadyDesc = {ak_all_descriptors};
+        bf_matcher_.add(trainReadyDesc);
+
         cardVector_.push_back(p);
 
         keypoints.clear();
-        allDescriptors.release();
+        si_all_descriptors.release();
+        ak_all_descriptors.release();
     }
     matcher_.train();
 
@@ -189,7 +203,7 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
     cv::morphologyEx(mask_out, mask_out, cv::MORPH_CLOSE, kernel_7);
     cv::erode(mask_out,mask_out,kernel_11);
     cv::dilate(mask_out,mask_out,kernel_3);
-    
+
     if(cv::countNonZero(mask_out) < (img.rows*img.cols)*0.02)
         return false;
     return true;
@@ -197,34 +211,20 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
 
 bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
 {
-    std::vector<std::vector<cv::DMatch>> matches;
-    std::vector<cv::KeyPoint> keypoints;
-    std::vector<int>::iterator maxCounts;
-    std::vector<int> matchCount(cardVector_.size());
-    cv::Mat descriptors;
-    float ratio = 0.75f;    //lowe's ratio
-    int imgIdx;
-    
-    sift_->detectAndCompute(img,mask,keypoints,descriptors);
-    matcher_.knnMatch(descriptors, matches, 2);
+    cv::Mat img_proc;
+    cv::imshow("pre preprocess", img);
+    preprocessImage(img,img_proc);
+    cv::imshow("post preprocess", img_proc);
+    cv::waitKey(0);
 
-    for(int i=0; i<matches.size();i++)
-    {
-        if(matches[i].size() >= 2 && matches[i][0].distance < ratio*matches[i][1].distance)
-        {
-            imgIdx=matches[i][0].imgIdx;
-            matchCount[imgIdx]++;
-        }
+    bool result=siftRecognition(img_proc, mask, card);
+    if(!result){
+        result=akazeRecognition(img_proc, mask, card);
+        if (result) std::cout<<"Found with AKAZE"<<std::endl;
+    }else{
+        std::cout<<"Found with SIFT"<<std::endl;
     }
-
-    maxCounts = std::max_element(matchCount.begin(),matchCount.end());
-    imgIdx = std::distance(matchCount.begin(),maxCounts);
-    
-    if(*maxCounts < 10)
-        return false;
-
-    card = cardVector_[imgIdx];
-    return true;
+    return result;
 }
 
 bool Eye::recognizeCard(const cv::Mat& img, std::pair<Suit, int>& card, cv::Mat& diffMask)
@@ -304,3 +304,107 @@ bool Eye::isNordPlaying(const cv::Mat& diffMask)
     cv::Mat bot=diffMask(cv::Rect(0, hh, diffMask.cols, diffMask.rows-hh));
     return (cv::countNonZero(up)>cv::countNonZero(bot));
 }
+
+bool Eye::siftRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
+{
+    std::vector<std::vector<cv::DMatch>> matches;
+    std::vector<cv::KeyPoint> keypoints;
+    std::vector<cv::Mat> channels;
+    std::vector<int> matchCount(cardVector_.size());
+    std::vector<int>::iterator maxCounts;
+    cv::Mat descriptors, allDescriptors;
+    float ratio = 0.75f;
+    int imgIdx;
+
+    sift_->detectAndCompute(img, mask, keypoints, descriptors);
+    if(!descriptors.empty())
+        allDescriptors.push_back(descriptors);
+
+    if (allDescriptors.empty())
+        return false;
+
+    matcher_.knnMatch(allDescriptors, matches, 2);
+    
+    for(int i=0; i<matches.size();i++)
+    {
+        if(matches[i].size() >= 2 && matches[i][0].distance < ratio*matches[i][1].distance)
+        {
+            imgIdx=matches[i][0].imgIdx;
+            matchCount[imgIdx]++;
+        }
+    }
+
+    maxCounts = std::max_element(matchCount.begin(),matchCount.end());
+    imgIdx = std::distance(matchCount.begin(),maxCounts);
+
+    if(*maxCounts < 10)
+        return false;
+
+    card = cardVector_[imgIdx];
+    return true;
+}
+
+bool Eye::akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
+{
+    std::vector<std::vector<cv::DMatch>> matches;
+    std::vector<cv::KeyPoint> keypoints;
+    std::vector<cv::Mat> channels;
+    std::vector<int> matchCount(cardVector_.size());
+    std::vector<int>::iterator maxCounts;
+    cv::Mat descriptors, allDescriptors;
+    int imgIdx, distance = 50;
+
+    cv::cvtColor(img,img,cv::COLOR_BGR2Lab);
+    cv::split(img,channels);
+
+    for(int i = 1; i <= 2; i++)
+    {
+        akaze_->detectAndCompute(channels[i], mask, keypoints, descriptors);
+        if(!descriptors.empty())
+            allDescriptors.push_back(descriptors);
+    }
+
+    if (allDescriptors.empty())
+        return false;
+
+    bf_matcher_.knnMatch(allDescriptors, matches, 2);
+    
+    for(int i=0; i<matches.size();i++)
+    {
+        if(matches[i].size() >= 2 && matches[i][0].distance < distance)
+        {
+            imgIdx=matches[i][0].imgIdx;
+            matchCount[imgIdx]++;
+        }
+    }
+
+    maxCounts = std::max_element(matchCount.begin(),matchCount.end());
+    imgIdx = std::distance(matchCount.begin(),maxCounts);
+
+    if(*maxCounts < 10)
+        return false;
+
+    card = cardVector_[imgIdx];
+    return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*cv::Mat image_with_features;
+    cv::namedWindow("AKAZE Features frame", cv::WINDOW_NORMAL);
+    cv::drawKeypoints(img, keypoints, image_with_features, cv::Scalar::all(-1), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    cv::imshow("AKAZE Features frame", image_with_features);
+    cv::resizeWindow("AKAZE Features frame",cv::Size(400,700));*/
