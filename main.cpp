@@ -1,3 +1,8 @@
+/**
+ * @file main.cpp
+ * @author Caterina Dri
+ */
+
 #include <iostream>
 #include <vector>
 #include <tuple>
@@ -39,7 +44,7 @@ int main() {
 
         // Starts the full 20-round analysis for the current game
         manager.processFullGame(gameName, baseFolderPath);
-        
+
         g++; 
     }
 
