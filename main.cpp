@@ -2,16 +2,11 @@
 #include <vector>
 #include <tuple>
 #include <string>
+#include <filesystem>
 #include <opencv2/opencv.hpp>
-#include <utils.h>
-#include <video_manager.h>
-#include <eye.h>
-#include <briscola.h>
-#include <reporter.h>
-
-std::string playerIdxToName(int idx) {
-    return (idx == 0) ? "North" : "South";
-}
+#include "utils.h"
+#include "eye.h"
+#include "gameManager.h"
 
 int main(int argc, char* argv[]) {
     bool showDetailedStats = false;
@@ -45,12 +40,16 @@ int main(int argc, char* argv[]) {
             return 0;
         }
     }
+
     std::string datasetPath = "../dataset/Briscola_Trentine";
+    std::string baseFolderPath = "../dataset/";
+
     std::vector<std::tuple<cv::Mat, Suit, int>> dataset = loadDataset(datasetPath);
     if (dataset.empty()) {
-        std::cerr << "Errore: Dataset non trovato in " << datasetPath << std::endl;
+        std::cerr << "Error: Dataset not found in " << datasetPath << std::endl;
         return -1;
     }
+
     if (verbose) {
         std::cout << "[VERBOSE] Dataset caricato: " << dataset.size() << " carte totali per il template matching." << std::endl;
     } else {
@@ -61,116 +60,18 @@ int main(int argc, char* argv[]) {
     watcher.fit(dataset);
 
     GameMetrics totalMetrics;
+    GameManager manager(&watcher);
 
     for (int g = 1; g <= 4; ++g) {
         std::string gameName = "game" + std::to_string(g);
-        std::cout << "\n========================================" << std::endl;
-        std::cout << " ANALISI " << gameName << std::endl;
-        std::cout << "========================================" << std::endl;
-        
-        if (verbose) {
-            std::cout << "[VERBOSE] Inizializzazione video per " << gameName << "..." << std::endl;
+        std::string expectedPath = baseFolderPath + gameName;
+
+        if (!std::filesystem::exists(expectedPath) || !std::filesystem::is_directory(expectedPath)) {
+            break; 
         }
 
-        Reporter reporter;
-        Briscola* game = nullptr;
-        Suit briscolaSuit = COINS;
-        int briscolaNumber = 0;
-        bool briscolaInitialized = false;
-
-        for (int r = 1; r <= 20; ++r) {
-            std::string videoPath = "../dataset/" + gameName + "/" + gameName + "round" + std::to_string(r) + ".mp4";
-            VideoFrameManager vfm(videoPath, 10); // Alzata leggermente la soglia movimento
-
-            if (!vfm.isOpened()) continue;
-
-            watcher.clear(); // Reset per ogni nuovo video
-            cv::Mat frame;
-            std::pair<Suit, int> recognizedCard;
-            std::vector<std::pair<Suit, int>> playedInRound;
-            std::vector<bool> playerOfCard;
-
-            // Determiniamo chi dovrebbe iniziare secondo la logica di gioco
-            int leaderIdx = (game == nullptr) ? 0 : game->getNextFirstPlayer();
-            std::string leaderName = playerIdxToName(leaderIdx);
-            
-            std::cout << "\n--- Round " << r << " (Leader: " << leaderName << ") ---" << std::endl;
-
-            while (vfm.getNextInterestingFrame(frame)) {
-                // cv::imshow("frame pre rec", frame);
-                // cv::waitKey(0);
-
-                if (watcher.recognize(frame, recognizedCard)) {
-                    // La prima carta che vediamo in ogni round (solitamente) è la Briscola sul tavolo.
-                    // Se non abbiamo ancora inizializzato la briscola ufficiale del game:
-                    if (!briscolaInitialized) {
-                        briscolaSuit = recognizedCard.first;
-                        briscolaNumber = recognizedCard.second;
-                        briscolaInitialized = true;
-                        game = new Briscola(briscolaSuit, 2);
-                        std::cout << "Briscola identificata: " << briscolaNumber << " di " << briscolaSuit << std::endl;
-                        continue; 
-                    }
-
-                    // Se abbiamo già la briscola e questa carta è proprio la briscola, 
-                    // la ignoriamo (è solo il watcher che l'ha usata per calibrare lastMask_)
-                    if (recognizedCard.first == briscolaSuit && recognizedCard.second == briscolaNumber) {
-                        // Se è la prima carta del round, è quasi certamente la briscola statica
-                        if (playedInRound.empty()) continue;
-                    }
-
-                    // Se arriviamo qui, è una carta giocata dai player
-                    bool isNord = watcher.wasNordActive();
-                    if (!playerOfCard.empty() && playerOfCard.back() == isNord) continue; // Salta i duplicati dello stesso player
-
-                    playedInRound.push_back(recognizedCard);
-                    playerOfCard.push_back(isNord);
-                    game->addCardToRound(recognizedCard.first, recognizedCard.second);
-                    std::cout << "Riconosciuta carta " << playedInRound.size() << ": " << recognizedCard.second << " di " << recognizedCard.first << std::endl;
-                    
-                    if (playedInRound.size() == 2) break;
-                }
-            }
-
-            if (playedInRound.size() == 2) {
-                if (verbose) {
-                    std::cout << "[VERBOSE] Round " << r << " parse effettuato con successo (trovate 2 carte)." << std::endl;
-                }
-                RoundData data;
-                data.round = r;
-                data.briscolaNumber = briscolaNumber;
-                data.briscolaSuit = briscolaSuit;
-                data.leader = leaderName;
-                
-                for (size_t i = 0; i < 2; ++i) {
-                    if (playerOfCard[i]) {
-                        data.northNumber = playedInRound[i].second; data.northSuit = playedInRound[i].first;
-                    } else {
-                        data.southNumber = playedInRound[i].second; data.southSuit = playedInRound[i].first;
-                    }
-                }
-
-                // Chi vince inizia il prossimo round (estratto dall'oggetto game aggiornato)
-                int winnerIdx = game->getNextFirstPlayer();
-                data.winner = playerIdxToName(winnerIdx);
-                data.points = game->getLastRoundPoints();
-
-                reporter.logRound(data);
-                std::cout << "Round " << r << " FINITO. Vincitore: " << data.winner << " (" << data.points << " pts)" << std::endl;
-            } else {
-                std::cout << "ERRORE: Round " << r << " incompleto (" << playedInRound.size() << "/2)" << std::endl;
-            }
-        }
-
-        std::string gtPath = "../dataset/" + gameName + "resultsCORRECTED.csv";
-        if (g == 2) {
-            gtPath = "../dataset/" + gameName + "resultsCORRECTED 2.csv";
-        }
-        std::cout << "\n>>> FINE ANALISI " << gameName << ". Risultati finali:" << std::endl;
-        GameMetrics gm = reporter.calculateMetrics(gtPath, showDetailedStats);
+        GameMetrics gm = manager.processFullGame(gameName, baseFolderPath, showDetailedStats);
         totalMetrics.add(gm);
-        
-        if (game) { delete game; game = nullptr; }
     }
 
     auto formatPct = [](int count, int total) {
@@ -187,7 +88,8 @@ int main(int argc, char* argv[]) {
     std::cout << "Card Recognition Accuracy: " << (totalMetrics.expectedCards > 0 ? (static_cast<double>(totalMetrics.correctCards) / totalMetrics.expectedCards) * 100.0 : 0.0) << "%" << std::endl;
     std::cout << "Player Identification Accuracy: " << (totalMetrics.totalPlayers > 0 ? (static_cast<double>(totalMetrics.correctPlayers) / totalMetrics.totalPlayers) * 100.0 : 0.0) << "%" << std::endl;
     std::cout << "Briscola Recognition Accuracy: " << (totalMetrics.expectedBriscola > 0 ? (static_cast<double>(totalMetrics.correctBriscola) / totalMetrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
-    std::cout << "Rounds Evaluated: " << totalMetrics.totalEvaluated << " / " << totalMetrics.expectedBriscola << std::endl;
+    std::cout << "Game Result Accuracy: " << (totalMetrics.expectedResultFields > 0 ? (static_cast<double>(totalMetrics.correctResultFields) / totalMetrics.expectedResultFields) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Rounds Evaluated: " << totalMetrics.totalEvaluated << " / " << (totalMetrics.expectedCards / 2) << std::endl;
 
     if (showDetailedStats) {
         std::cout << "\n--- DETAILED SUIT METRICS (GLOBAL) ---\n";
@@ -211,6 +113,8 @@ int main(int argc, char* argv[]) {
                       << std::endl;
         }
     }
+
+    std::cout << "\n>>> ALL THE GAMES HAVE BEEN PROCESSED SUCCESSFULLY!" << std::endl;
 
     return 0;
 }

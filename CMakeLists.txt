@@ -18,6 +18,7 @@ add_executable(${PROJECT_NAME}
     src/eye.cpp
     src/reporter.cpp
     src/briscola.cpp
+    src/gameManager.cpp
     )
 
 #add_executable(test_refactoring

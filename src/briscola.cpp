@@ -1,11 +1,9 @@
-#include <briscola.h>
+#include "briscola.h"
 #include <stdexcept>
-#include <algorithm>
+#include <string>
 
-//TO DO: serve FARE UNa tradzuione di numero -- carta??
-
-//returns the rank of the card for comparison purposes (higher = stronger card)
-//ranking: 1 > 3 > 10 > 9 > 8 > 7 > 6 > 5 > 4 > 2
+// Returns the rank of the card for comparison purposes (higher = stronger card).
+// Ranking: 1 > 3 > 10 > 9 > 8 > 7 > 6 > 5 > 4 > 2
 static int cardRank(int number) {
     switch (number) {
         case 1:  return 10;
@@ -22,8 +20,8 @@ static int cardRank(int number) {
             throw std::invalid_argument("Card number not valid: " + std::to_string(number));
     }
 }
- 
-// return the points of the card
+
+// Returns the points of the card.
 static int cardPoints(int number) {
     switch (number) {
         case 1:  return 11;
@@ -35,46 +33,66 @@ static int cardPoints(int number) {
     }
 }
 
-//--------------CONSTRUCTOR--------------
+// ============================================================================
+// CONSTRUCTOR
+// ============================================================================
 
-Briscola::Briscola(Suit suit, int players) 
-    : briscolaSuit(suit), 
-    players(players), 
-    nextFirstPlayer(0) {
-    scores.resize(players, 0);
+Briscola::Briscola(Suit suit, int players)
+    : players(players),
+      nextFirstPlayer(0), // Overwritten by the leader passed to the first playRound() call
+      lastRoundPoints(0),
+      briscolaSuit(suit) {
 
-    if(players != 2) {
-        throw std::invalid_argument("Number of players must be between 2");
+    if (players != 2) {
+        throw std::invalid_argument("Briscola only supports 2 players (North/South).");
     }
+
+    scores.resize(players, 0);
     currentRoundCards.reserve(players);
 }
 
-//--------------PUBLIC METHODS--------------
+// ============================================================================
+// PUBLIC METHODS
+// ============================================================================
+RoundResult Briscola::playRound(const Card& northCard, const Card& southCard, Player leader) {
+    cardRank(northCard.number); 
+    cardRank(southCard.number); 
 
-bool Briscola::addCardToRound(Suit suit, int number) {
-    cardRank(number); // validate card number, will throw if invalid
- 
     if (isRoundComplete())
-        throw std::logic_error("Round is not complete. Call computeRound() before adding new cards.");
- 
-    currentRoundCards.push_back({suit, number});
- 
-    if (isRoundComplete()) {
-        computeRound();
-        return true;
+        throw std::logic_error("Cannot play round: previous round was not consumed");
+
+    // We push the cards in play order according to the externally provided leader.
+    // This ensures currentRoundCards[0] is always the card played by the leader.
+    if (leader == Player::North) {
+        currentRoundCards.push_back({northCard.suit, northCard.number});
+        currentRoundCards.push_back({southCard.suit, southCard.number});
+    } else {
+        currentRoundCards.push_back({southCard.suit, southCard.number});
+        currentRoundCards.push_back({northCard.suit, northCard.number});
     }
-    return false;
+
+    nextFirstPlayer = static_cast<int>(leader);
+
+    int winnerIndex = computeRound(); 
+
+    return RoundResult{
+        leader,
+        indexToPlayer(winnerIndex),
+        lastRoundPoints
+    };
 }
 
-std::vector<int> Briscola::getScores() {
+std::vector<int> Briscola::getScores() const {
     return scores;
 }
 
-Suit Briscola::getBriscolaSuit() {
+Suit Briscola::getBriscolaSuit() const {
     return briscolaSuit;
 }
 
-//--------------PRIVATE METHODS--------------
+// ============================================================================
+// PRIVATE METHODS
+// ============================================================================
 
 void Briscola::setScores(const std::vector<int>& newScores) {
     if (static_cast<int>(newScores.size()) != players)
@@ -90,73 +108,67 @@ int Briscola::computeRound() {
     if (!isRoundComplete())
         throw std::logic_error("Round is not complete.");
 
-    // Determine the playing order for this round, starting from nextFirstPlayer
-    //playOrder[0] = nextFirstPlayer, playOrder[1] = (nextFirstPlayer + 1) % players, etc.
     std::vector<int> playOrder(players);
     for (int i = 0; i < players; ++i)
         playOrder[i] = (nextFirstPlayer + i) % players;
- 
-    // The first card played determines the "dominant" suit (opening suit).
-    // nextFirstPlayer indicates who opened: their card is in position 0,
-    // the others follow in playing order.
-    Suit leadSuit = currentRoundCards[0].first;
- 
-    // ── Computing the winner ──────────────────────────────────────────────
-    // Rule 1: if a card is briscola it beats any non-briscola card.
-    // Rule 2: if both (or neither) are briscola, or both have the
-    //           same suit as the opening, the one with the higher rank wins.
-    // Rule 3: if the response card has a different suit from the opening
-    //           (and neither is briscola), the opening card wins.
 
-    // We assume that the first player (playOrder[0]) is the winner until we find a challenger that beats him.
+    Suit leadSuit = currentRoundCards[0].first;
+
+    // Briscola rules for determining the winner:
+    // Rule 1: briscola beats any non-briscola card.
+    // Rule 2: if both are briscola, the higher rank wins.
+    // Rule 3: if neither is briscola, the challenger can only win if it
+    //         matches the lead suit and has a higher rank.
     int globalWinner = playOrder[0];
-    int winnerCardIdx = 0; //index of the winning card in currentRoundCards
- 
+    int winnerCardIdx = 0; // index into currentRoundCards of the current winning card
+
     for (int i = 1; i < players; ++i) {
-        const std::pair<Suit, int>& challenger = currentRoundCards[i]; //challenger's card
-        const std::pair<Suit, int>& current    = currentRoundCards[winnerCardIdx]; //current winning card
+        const std::pair<Suit, int>& challenger = currentRoundCards[i];
+        const std::pair<Suit, int>& current    = currentRoundCards[winnerCardIdx];
 
         bool challengerIsBriscola = (challenger.first == briscolaSuit);
         bool currentIsBriscola    = (current.first    == briscolaSuit);
 
         if (challengerIsBriscola && !currentIsBriscola) {
-            // next player's card is briscola, current winning card is not → next player takes the lead
             globalWinner  = playOrder[i];
             winnerCardIdx = i;
-        } else if (!challengerIsBriscola && currentIsBriscola) { // challenger's card is not briscola, current winning card is → current player keeps the lead
-            // winnerCardIdx stays the same
-        } else if (challengerIsBriscola && currentIsBriscola) { //both are briscola, compare rank
+        } else if (!challengerIsBriscola && currentIsBriscola) {
+            // The current winning card keeps the lead
+        } else if (challengerIsBriscola && currentIsBriscola) {
             if (cardRank(challenger.second) > cardRank(current.second)) {
                 globalWinner  = playOrder[i];
                 winnerCardIdx = i;
             }
-        } else { //none is briscola
-            if (challenger.first == leadSuit) {
-                if (cardRank(challenger.second) > cardRank(current.second)) { //challenger has same suit as lead and higher rank → challenger takes the lead
-                    globalWinner  = playOrder[i];
-                    winnerCardIdx = i;
-                }
+        } else { // Neither is briscola
+            if (challenger.first == leadSuit &&
+                cardRank(challenger.second) > cardRank(current.second)) {
+                globalWinner  = playOrder[i];
+                winnerCardIdx = i;
             }
-            //challenger has different suit from lead → current winning card keeps the lead
         }
     }
- 
-    //compute points of the round
+
     int roundPoints = 0;
     for (const std::pair<Suit, int>& card : currentRoundCards)
         roundPoints += cardPoints(card.second);
- 
+
     lastRoundPoints = roundPoints;
-    std::cout<<"POINTS OF THIS ROUND: "<<roundPoints<<std::endl;
+
     std::vector<int> newScores = scores;
     newScores[globalWinner] += roundPoints;
     setScores(newScores);
- 
-    // prepare for next round: the winner of this round will start the next round, so we update nextFirstPlayer and clear currentRoundCards
-    nextFirstPlayer = globalWinner;
-    currentRoundCards.clear();
- 
-    return globalWinner;
 
+    currentRoundCards.clear();
+
+    return globalWinner;
 }
 
+Player Briscola::indexToPlayer(int index) const {
+    if (index == static_cast<int>(Player::North)) {
+        return Player::North;
+    }
+    if (index == static_cast<int>(Player::South)) {
+        return Player::South;
+    }
+    throw std::invalid_argument("Invalid player index.");
+}

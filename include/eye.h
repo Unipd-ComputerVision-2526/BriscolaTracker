@@ -52,14 +52,6 @@ class Eye
         bool findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
         bool recognizeCard(const cv::Mat& img, std::pair<Suit, int>& card, cv::Mat& diffMask);
         bool isNordPlaying(const cv::Mat& img);
-
-        // Fallback Template Matching
-        cv::Mat templLarge_;
-        cv::Mat templMedium_;
-        bool templatesLoaded_ = false;
-        
-        void loadTemplates();
-        int countDenari(const cv::Mat& img, const cv::Mat& mask);
 };
 
 #endif

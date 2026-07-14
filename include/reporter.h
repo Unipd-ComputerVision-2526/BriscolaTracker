@@ -116,6 +116,11 @@ public:
     void logRound(const RoundData& data);
 
     /**
+     * @brief Clears the internal history buffer.
+     */
+    void clear() { history_.clear(); }
+
+    /**
      * @brief Exports the recorded rounds to a CSV file.
      * @param filename Output CSV path.
      */
