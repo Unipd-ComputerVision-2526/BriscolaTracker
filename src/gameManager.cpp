@@ -121,6 +121,13 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             if (isTheStaticBriscola && roundNumber <= LastRoundWithBriscolaOnTable) {
                 continue;
             }
+
+            // TOPPA LOGICA: Ignoriamo esplicitamente l'1 di Bastoni (1 di 4) perché è un falso positivo
+            // noto di SIFT causato dalla mano del giocatore che entra nell'inquadratura.
+            // Questo replica il comportamento involontario ma efficace del vecchio main.cpp.
+            if (recognizedCard.first == Suit::CLUBS && recognizedCard.second == 1) {
+                continue;
+            }
  
             bool isNorthCard = watcher->wasNordActive();
             Card card{recognizedCard.first, recognizedCard.second};
