@@ -68,9 +68,15 @@ void Reporter::exportCSV(const std::string& filename) const {
     file.close();
 }
 
-void Reporter::generateFinalReport(const std::string& filename, int totalNorth, int totalSouth) const {
+void Reporter::generateFinalReport(const std::string& filename) const {
     std::ofstream file(filename);
     if (!checkStream(file, filename)) return;
+
+    int totalNorth = 0, totalSouth = 0;
+    for (const auto& r : history_) {
+        if (r.winner == "North") totalNorth += r.points;
+        else if (r.winner == "South") totalSouth += r.points;
+    }
 
     file << "====================================================\n";
     file << "           BRISCOLA TRACKER - FINAL REPORT          \n";
@@ -269,4 +275,42 @@ GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath, bool 
     printMetricsReport(metrics, showDetailedStats);
 
     return metrics;
+}
+
+// ============================================================================
+// CONSOLE OUTPUT METHODS
+// ============================================================================
+
+void Reporter::printGameStart(const std::string& gameName) const {
+    std::cout << "\n========================================" << std::endl;
+    std::cout << " STARTING ANALYSIS: " << gameName << std::endl;
+    std::cout << "========================================" << std::endl;
+}
+
+void Reporter::printGameEnd(const std::string& gameName) const {
+    std::cout << "\n>>> END OF ANALYSIS for " << gameName << ". Final Results:" << std::endl;
+}
+
+void Reporter::printBriscolaIdentified(int number, Suit suit, int maxFreq) const {
+    std::cout << ">>> Briscola correctly identified: "
+              << number << " of " << suitToString(suit)
+              << " (seen in " << maxFreq << " frames across first 3 rounds)" << std::endl;
+}
+
+void Reporter::printRoundStart(int roundNumber) const {
+    std::cout << "\n--- Round " << roundNumber << " ---" << std::endl;
+}
+
+void Reporter::printCardRecognized(const std::string& playerName, int number, Suit suit) const {
+    std::cout << "Recognized " << playerName << " card: " 
+              << number << " of " << suitToString(suit) << std::endl;
+}
+
+void Reporter::printRoundFinished(int roundNumber, const std::string& leader, const std::string& winner, int points) const {
+    std::cout << "Round " << roundNumber << " FINISHED. Leader: " << leader
+              << ". Winner: " << winner << " (" << points << " pts)" << std::endl;
+}
+
+void Reporter::printError(const std::string& message) const {
+    std::cerr << message << std::endl;
 }

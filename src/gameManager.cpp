@@ -32,9 +32,7 @@ GameManager::~GameManager() = default;
 
 // Main workflow to process all 20 rounds of a game
 GameMetrics GameManager::processFullGame(const std::string& gameName, const std::string& baseFolderPath, bool showDetailedStats) {
-    std::cout << "\n========================================" << std::endl;
-    std::cout << " STARTING ANALYSIS: " << gameName << std::endl;
-    std::cout << "========================================" << std::endl;
+    reporter.printGameStart(gameName);
  
     isBriscolaIdentified = false;
     briscolaPickedUp = false;
@@ -50,7 +48,7 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
     identifyBriscola(gameName, baseFolderPath);
 
     if (!isBriscolaIdentified) {
-        std::cerr << "Cannot proceed without Briscola. Skipping game." << std::endl;
+        reporter.printError("Cannot proceed without Briscola. Skipping game.");
         return GameMetrics();
     }
 
@@ -72,7 +70,18 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
         gtPath = gtPath2;
     }
 
-    std::cout << "\n>>> END OF ANALYSIS for " << gameName << ". Final Results:" << std::endl;
+    reporter.printGameEnd(gameName);
+
+    // --- AGGIUNTA PER LA CONSEGNA ---
+    // Esporta il CSV round per round e il TXT con il risultato finale
+    std::filesystem::create_directories("results");
+    std::string outCsvPath = "results/" + gameName + "predictions.csv";
+    reporter.exportCSV(outCsvPath);
+    
+    std::string outTxtPath = "results/" + gameName + "predicted_output.txt";
+    reporter.generateFinalReport(outTxtPath);
+    // --------------------------------
+
     return reporter.calculateMetrics(gtPath, showDetailedStats);
 }
 
@@ -127,7 +136,7 @@ void GameManager::identifyBriscola(const std::string& gameName, const std::strin
         VideoFrameManager vfm(videoPath);
  
         if (!vfm.isOpened()) {
-            std::cerr << ">>> Warning: Cannot open video for Briscola identification: " << videoPath << std::endl;
+            reporter.printError(">>> Warning: Cannot open video for Briscola identification: " + videoPath);
             continue; // If a video is not found, skip and try the next one
         }
  
@@ -163,11 +172,9 @@ void GameManager::identifyBriscola(const std::string& gameName, const std::strin
         // Initializes the game engine with the identified briscola
         gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
  
-        std::cout << ">>> Briscola correctly identified: "
-                  << currentBriscolaCard.number << " of " << currentBriscolaCard.suit
-                  << " (seen in " << maxFreq << " frames across first 3 rounds)" << std::endl;
+        reporter.printBriscolaIdentified(currentBriscolaCard.number, currentBriscolaCard.suit, maxFreq);
     } else {
-        std::cerr << ">>> ERROR: Could not identify any card as Briscola in the first 3 rounds!" << std::endl;
+        reporter.printError(">>> ERROR: Could not identify any card as Briscola in the first 3 rounds!");
     }
 }
 
@@ -176,8 +183,7 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
     // enable motion-based frame selection.
     VideoFrameManager vfm(videoPath);
     if (!vfm.isOpened()) {
-        std::cerr << ">>> ERROR: Cannot open video for round"
-                << roundNumber << " to path: " << videoPath << std::endl;
+        reporter.printError(">>> ERROR: Cannot open video for round " + std::to_string(roundNumber) + " to path: " + videoPath);
         return;
     }
 
@@ -205,7 +211,7 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
     bool leaderKnown = false;
     Player leader = Player::North; // Overwritten as soon as the first card of the round is found
 
-    std::cout << "\n--- Round " << roundNumber << " ---" << std::endl;
+    reporter.printRoundStart(roundNumber);
 
     while (vfm.getNextInterestingFrame(frame)) {
         if (watcher->recognize(frame, recognizedCard)) {
@@ -252,8 +258,7 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
                 leaderKnown = true; 
             }
             
-            std::cout << "Recognized " << playerIdxToName(myIdx) << " card: " 
-                      << card.number << " of " << card.suit << std::endl;
+            reporter.printCardRecognized(playerIdxToName(myIdx), card.number, card.suit);
 
             // Break early as soon as we have both played cards
             if (found[0] && found[1]) break;
@@ -283,16 +288,16 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             data.points = result.points;
 
             reporter.logRound(data);
-            std::cout << "Round " << roundNumber << " FINISHED. Leader: " << data.leader
-                      << ". Winner: " << data.winner << " (" << data.points << " pts)" << std::endl;
+            reporter.printRoundFinished(roundNumber, data.leader, data.winner, data.points);
         } catch (const std::exception& e) {
-            std::cerr << ">>> ERROR: Round " << roundNumber
-                      << " could not be resolved (" << e.what() << "). Skipping." << std::endl;
+            reporter.printError(">>> ERROR: Round " + std::to_string(roundNumber) + 
+                                " could not be resolved (" + std::string(e.what()) + "). Skipping.");
         }
     } else {
-        std::cout << "ERROR: Round " << roundNumber << " incomplete (North: "
-                  << (found[0] ? "found" : "missing") << ", South: "
-                  << (found[1] ? "found" : "missing") << ")" << std::endl;
+        std::string err = "ERROR: Round " + std::to_string(roundNumber) + " incomplete (North: " +
+                          (found[0] ? "found" : "missing") + ", South: " +
+                          (found[1] ? "found" : "missing") + ")";
+        reporter.printError(err);
     }
 }
  
