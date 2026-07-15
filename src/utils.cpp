@@ -4,15 +4,12 @@
 
 namespace fs = std::filesystem;
 
-// Verifica se il file è un'immagine JPG valida da processare
+// Accept only JPG dataset assets.
 bool isValidImageFile(const fs::directory_entry& entry) {
     std::string ext = entry.path().extension().string();
-
-    // Salto i file che non sono immagini JPG o file di sistema tipo Zone.Identifier
     return (ext == ".JPG" || ext == ".jpg");
 }
 
-// Converte una stringa nel corrispondente enum Suit
 Suit stringToSuit(const std::string& semeStr) {
     if (semeStr == "coins") return COINS;
     if (semeStr == "cups") return CUPS;
@@ -23,28 +20,27 @@ Suit stringToSuit(const std::string& semeStr) {
     return COINS;
 }
 
-// Estrae Numero e Suit dal nome del file (es: "10-clubs.JPG")
+// Expected format: <number>-<suit>.<ext>
 bool parseFileName(const std::string& filename, int& numero, Suit& seme) {
-    size_t posDash = filename.find('-'); //posizione del trattino
-    size_t posDot = filename.find('.'); //posizione del punto dell'estensione 
+    size_t posDash = filename.find('-');
+    size_t posDot = filename.find('.');
     
     if (posDash == std::string::npos || posDot == std::string::npos) {
-        return false; //npos è un valore speciale che indica "non trovato", se non troviamo il trattino o il punto, il formato è errato.
+        return false;
     }
 
     try {
-        std::string numStr = filename.substr(0, posDash); //estrai la parte del numero prima del trattino
-        std::string semeStr = filename.substr(posDash + 1, posDot - posDash - 1); //estrai la parte del seme tra il trattino e il punto
+        std::string numStr = filename.substr(0, posDash);
+        std::string semeStr = filename.substr(posDash + 1, posDot - posDash - 1);
         
-        numero = std::stoi(numStr); //converte la stringa del numero in un intero.
-        seme = stringToSuit(semeStr); //converte la stringa del seme in un enum Suit.
+        numero = std::stoi(numStr);
+        seme = stringToSuit(semeStr);
         return true;
     } catch (const std::exception& e) {
         return false;
     }
 }
 
-// Legge tutte le immagini delle carte dal percorso specificato.
 std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datasetPath) {
     std::vector<std::tuple<cv::Mat, Suit, int>> dataset;
 

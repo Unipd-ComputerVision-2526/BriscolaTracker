@@ -17,8 +17,14 @@ public:
     // Destructor
     ~GameManager();
 
-    // Analyzes a complete 20-round game from the given folder
-    void processFullGame(const std::string& gameName, const std::string& baseFolderPath);
+    /**
+     * @brief Processes an entire game (20 rounds).
+     * @param gameName The identifier of the game (e.g., "game1").
+     * @param baseFolderPath The path where the game folder is located.
+     * @param showDetailedStats If true, prints detailed suit stats after the game.
+     * @return GameMetrics containing the results of the evaluation against ground truth.
+     */
+    GameMetrics processFullGame(const std::string& gameName, const std::string& baseFolderPath, bool showDetailedStats = false);
 
 private:
     // Pointer to the shared computer vision system (not owned)

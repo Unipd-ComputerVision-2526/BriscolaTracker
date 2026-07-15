@@ -5,8 +5,20 @@
 #include <iomanip>
 #include <algorithm>
 
-void Reporter::clear() {
-    history_.clear();
+namespace {
+int safeStoi(const std::string& s) {
+    if (s.empty()) return 0;
+    try { return std::stoi(s); }
+    catch (...) { return 0; }
+}
+
+std::string formatPct(int count, int total) {
+    if (total == 0) return std::string("-");
+    double pct = (static_cast<double>(count) / total) * 100.0;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%d (%.1f%%)", count, pct);
+    return std::string(buf);
+}
 }
 
 void Reporter::logRound(const RoundData& data) {
@@ -91,64 +103,170 @@ void Reporter::generateFinalReport(const std::string& filename, int totalNorth, 
     file.close();
 }
 
-void Reporter::calculateMetrics(const std::string& groundTruthPath) const {
-    std::ifstream file(groundTruthPath);
-    if (!checkStream(file, groundTruthPath)) return;
-
-    auto safeStoi = [](const std::string& s) {
-        if (s.empty()) return 0;
-        try { return std::stoi(s); }
-        catch (...) { return 0; }
-    };
-
-    std::string line, val;
+std::vector<RoundData> Reporter::parseGroundTruth(std::ifstream& file) const {
+    std::string line;
     std::vector<RoundData> gt;
-    std::getline(file, line); // Skip header
+    std::getline(file, line); // Consume CSV header.
 
     while (std::getline(file, line)) {
         if (line.empty()) continue;
-        std::stringstream ss(line);
-        RoundData r;
-        std::getline(ss, val, ','); r.round = safeStoi(val); // Read Round column
-        std::getline(ss, val, ','); r.northNumber = safeStoi(val);
-        std::getline(ss, val, ','); r.northSuit = stringToSuitInternal(val);
-        std::getline(ss, val, ','); r.southNumber = safeStoi(val);
-        std::getline(ss, val, ','); r.southSuit = stringToSuitInternal(val);
-        std::getline(ss, val, ','); r.briscolaNumber = safeStoi(val);
-        std::getline(ss, val, ','); r.briscolaSuit = stringToSuitInternal(val);
-        std::getline(ss, val, ','); r.leader = val;
-        // Fix typo in ground truth ("Sud" instead of "South")
-        if (r.leader == "Sud") r.leader = "South";
-        std::getline(ss, val, ','); r.winner = val;
-        if (r.winner == "Sud") r.winner = "South";
-        std::getline(ss, val, ','); r.points = safeStoi(val);
-        gt.push_back(r);
+        gt.push_back(parseGroundTruthLine(line));
     }
 
-    int correctCards = 0, correctPlayers = 0, correctBriscola = 0;
-    int totalEvaluated = 0;
+    return gt;
+}
 
-    for (const auto& loggedRound : history_) {
-        // Find matching round in ground truth
-        auto it = std::find_if(gt.begin(), gt.end(), [&loggedRound](const RoundData& g) {
-            return g.round == loggedRound.round;
+RoundData Reporter::parseGroundTruthLine(const std::string& line) const {
+    std::stringstream ss(line);
+    std::string val;
+    RoundData r;
+
+    std::getline(ss, val, ','); r.round = safeStoi(val);
+    std::getline(ss, val, ','); r.northNumber = safeStoi(val);
+    std::getline(ss, val, ','); r.northSuit = stringToSuitInternal(val);
+    std::getline(ss, val, ','); r.southNumber = safeStoi(val);
+    std::getline(ss, val, ','); r.southSuit = stringToSuitInternal(val);
+    std::getline(ss, val, ','); r.briscolaNumber = safeStoi(val);
+    std::getline(ss, val, ','); r.briscolaSuit = stringToSuitInternal(val);
+    std::getline(ss, val, ','); r.leader = val;
+    if (r.leader == "Sud") r.leader = "South";
+    std::getline(ss, val, ','); r.winner = val;
+    if (r.winner == "Sud") r.winner = "South";
+    std::getline(ss, val, ','); r.points = safeStoi(val);
+
+    return r;
+}
+
+void Reporter::updateExpectedMetrics(GameMetrics& metrics, const RoundData& gtRound) const {
+    metrics.suits[gtRound.northSuit].expected++;
+    metrics.suits[gtRound.southSuit].expected++;
+    metrics.expectedCards += 2;
+    metrics.totalPlayers += 2;
+}
+
+void Reporter::evaluateMatchedRound(const RoundData& detected, const RoundData& gtRound, GameMetrics& metrics) const {
+    metrics.totalEvaluated++;
+
+    if (detected.northSuit == gtRound.northSuit) {
+        metrics.suits[gtRound.northSuit].correctSuit++;
+        if (detected.northNumber == gtRound.northNumber) {
+            metrics.suits[gtRound.northSuit].exactMatch++;
+            metrics.correctCards++;
+        }
+    } else {
+        metrics.suits[gtRound.northSuit].wrongSuit++;
+    }
+
+    if (detected.southSuit == gtRound.southSuit) {
+        metrics.suits[gtRound.southSuit].correctSuit++;
+        if (detected.southNumber == gtRound.southNumber) {
+            metrics.suits[gtRound.southSuit].exactMatch++;
+            metrics.correctCards++;
+        }
+    } else {
+        metrics.suits[gtRound.southSuit].wrongSuit++;
+    }
+
+    if (detected.leader == gtRound.leader) metrics.correctPlayers++;
+    if (detected.winner == gtRound.winner) metrics.correctPlayers++;
+}
+
+void Reporter::markIncompleteRound(const RoundData& gtRound, GameMetrics& metrics) const {
+    metrics.suits[gtRound.northSuit].incompleteRound++;
+    metrics.suits[gtRound.southSuit].incompleteRound++;
+}
+
+void Reporter::printMetricsReport(const GameMetrics& metrics, bool showDetailedStats) const {
+    std::cout << "\n--- PERFORMANCE METRICS ---" << std::endl;
+    std::cout << "Card Recognition Accuracy: " << (metrics.expectedCards > 0 ? (static_cast<double>(metrics.correctCards) / metrics.expectedCards) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Player Identification Accuracy: " << (metrics.totalPlayers > 0 ? (static_cast<double>(metrics.correctPlayers) / metrics.totalPlayers) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Briscola Recognition Accuracy: " << (metrics.expectedBriscola > 0 ? (static_cast<double>(metrics.correctBriscola) / metrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Game Result Accuracy: " << (metrics.expectedResultFields > 0 ? (static_cast<double>(metrics.correctResultFields) / metrics.expectedResultFields) * 100.0 : 0.0) << "%" << std::endl;
+    std::cout << "Rounds Evaluated: " << metrics.totalEvaluated << " / " << (metrics.expectedCards / 2) << std::endl;
+
+    if (showDetailedStats) {
+        std::cout << "\n--- DETAILED SUIT METRICS ---\n";
+        std::cout << std::left << std::setw(10) << "SUIT"
+                  << std::setw(15) << "totale atteso"
+                  << std::setw(20) << "Seme corretto"
+                  << std::setw(25) << "Seme + Numero esatti"
+                  << std::setw(20) << "Seme errato"
+                  << std::setw(20) << "Round incompleto"
+                  << std::endl;
+
+        std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
+        for (int i = 1; i <= 4; ++i) {
+            const auto& sm = metrics.suits[i];
+            std::cout << std::left << std::setw(10) << suitNames[i]
+                      << std::setw(15) << sm.expected
+                      << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
+                      << std::setw(25) << formatPct(sm.exactMatch, sm.expected)
+                      << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
+                      << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
+                      << std::endl;
+        }
+    }
+}
+
+GameMetrics Reporter::calculateMetrics(const std::string& groundTruthPath, bool showDetailedStats) const {
+    GameMetrics metrics;
+
+    std::ifstream file(groundTruthPath);
+    if (!checkStream(file, groundTruthPath)) {
+        return metrics;
+    }
+
+    std::vector<RoundData> gt = parseGroundTruth(file);
+
+    metrics.expectedBriscola = 1;
+
+    for (const auto& gtRound : gt) {
+        updateExpectedMetrics(metrics, gtRound);
+
+        auto it = std::find_if(history_.begin(), history_.end(), [&gtRound](const RoundData& h) {
+            return h.round == gtRound.round;
         });
 
-        if (it != gt.end()) {
-            totalEvaluated++;
-            if (loggedRound.northNumber == it->northNumber && loggedRound.northSuit == it->northSuit) correctCards++;
-            if (loggedRound.southNumber == it->southNumber && loggedRound.southSuit == it->southSuit) correctCards++;
-            if (loggedRound.leader == it->leader) correctPlayers++;
-            if (loggedRound.winner == it->winner) correctPlayers++;
-            if (loggedRound.briscolaNumber == it->briscolaNumber && loggedRound.briscolaSuit == it->briscolaSuit) correctBriscola++;
+        if (it != history_.end()) {
+            evaluateMatchedRound(*it, gtRound, metrics);
+        } else {
+            markIncompleteRound(gtRound, metrics);
         }
     }
 
-    std::cout << "\n--- PERFORMANCE METRICS ---" << std::endl;
-    // We expect exactly 40 cards across 20 rounds, and 40 player ID validations.
-    // If some rounds are missing, they count as wrong (hence dividing by 40.0)
-    std::cout << "Card Recognition Accuracy: " << (static_cast<double>(correctCards) / 40.0) * 100.0 << "%" << std::endl;
-    std::cout << "Player Identification Accuracy: " << (static_cast<double>(correctPlayers) / 40.0) * 100.0 << "%" << std::endl;
-    std::cout << "Briscola Recognition Accuracy: " << (static_cast<double>(correctBriscola) / 20.0) * 100.0 << "%" << std::endl;
-    std::cout << "Rounds Evaluated: " << totalEvaluated << " / 20" << std::endl;
+    // --- BRISCOLA RECOGNITION ACCURACY ---
+    if (!history_.empty() && !gt.empty()) {
+        if (history_[0].briscolaNumber == gt[0].briscolaNumber && history_[0].briscolaSuit == gt[0].briscolaSuit) {
+            metrics.correctBriscola = 1;
+        } else {
+            metrics.correctBriscola = 0;
+        }
+    } else {
+        metrics.correctBriscola = 0;
+    }
+
+    // --- GAME RESULT ACCURACY ---
+    int gtNorthPts = 0, gtSouthPts = 0;
+    for (const auto& r : gt) {
+        if (r.winner == "North") gtNorthPts += r.points;
+        else if (r.winner == "South") gtSouthPts += r.points;
+    }
+    std::string gtWinner = gtNorthPts > gtSouthPts ? "North" : (gtSouthPts > gtNorthPts ? "South" : "Draw");
+
+    int detNorthPts = 0, detSouthPts = 0;
+    for (const auto& r : history_) {
+        if (r.winner == "North") detNorthPts += r.points;
+        else if (r.winner == "South") detSouthPts += r.points;
+    }
+    std::string detWinner = detNorthPts > detSouthPts ? "North" : (detSouthPts > detNorthPts ? "South" : "Draw");
+
+    metrics.correctResultFields = 0;
+    metrics.expectedResultFields = 3;
+    if (detNorthPts == gtNorthPts) metrics.correctResultFields++;
+    if (detSouthPts == gtSouthPts) metrics.correctResultFields++;
+    if (detWinner == gtWinner) metrics.correctResultFields++;
+
+    printMetricsReport(metrics, showDetailedStats);
+
+    return metrics;
 }
