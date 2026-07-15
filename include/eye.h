@@ -22,6 +22,7 @@ class Eye
         bool wasNordActive() {return plN_;};
         // Fills card with the last recognized card if present, else returns false
         bool getLastCard(std::pair<Suit, int>& card);
+        void setBaseline(const cv::Mat& img);
         
         private:
         // Feature extractor
@@ -41,6 +42,9 @@ class Eye
         
         int channelNum_;
         bool plN_;
+        
+        int accumulatedUp_ = 0;
+        int accumulatedBot_ = 0;
 
         bool isValidImage(const cv::Mat& img);
         bool isValidModelState();
@@ -51,15 +55,17 @@ class Eye
         bool findCardPosition(const cv::Mat& img, cv::Mat& mask_out);
         bool findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
         bool recognizeCard(const cv::Mat& img, std::pair<Suit, int>& card, cv::Mat& diffMask);
-        bool isNordPlaying(const cv::Mat& img);
 
         // Fallback Template Matching
         cv::Mat templLarge_;
         cv::Mat templMedium_;
         bool templatesLoaded_ = false;
+        double expectedRatio4_ = 0.0;
+        double expectedRatio6_ = 0.0;
         
         void loadTemplates();
-        int countDenari(const cv::Mat& img, const cv::Mat& mask);
+        std::vector<cv::Rect> getDenariRects(const cv::Mat& img, const cv::Mat& mask);
+        double calculateAspectRatios(const std::vector<cv::Rect>& rects);
 };
 
 #endif

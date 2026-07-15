@@ -16,6 +16,21 @@ void Eye::clear()
 {
     recognizedCards_.clear();
     lastMask_ = cv::Mat();
+    residualImage_ = cv::Mat();
+    accumulatedUp_ = 0;
+    accumulatedBot_ = 0;
+}
+
+void Eye::setBaseline(const cv::Mat& img)
+{
+    if (img.empty()) return;
+    cv::Mat rescaled, mask;
+    cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
+    if(findCardPosition(rescaled, mask)) {
+        cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
+        lastMask_ = mask.clone();
+        residualImage_ = img.clone();
+    }
 }
 
 void Eye::reset()
@@ -74,10 +89,30 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
         throw std::invalid_argument("EyeError: The image has not the right file format. "+std::to_string(channelNum_)+" channels images needed.");
     
     cv::Mat diffMask;
+    bool found = recognizeCard(image, card, diffMask);
 
-    if(recognizeCard(image,card,diffMask))
+    if (!diffMask.empty()) {
+        int hh = diffMask.rows / 2;
+        cv::Mat up = diffMask(cv::Rect(0, 0, diffMask.cols, hh));
+        cv::Mat bot = diffMask(cv::Rect(0, hh, diffMask.cols, diffMask.rows - hh));
+        accumulatedUp_ += cv::countNonZero(up);
+        accumulatedBot_ += cv::countNonZero(bot);
+    }
+
+    if(found)
     {
-        plN_=isNordPlaying(diffMask);
+        if (accumulatedUp_ == 0 && accumulatedBot_ == 0 && !diffMask.empty()) {
+            int hh = diffMask.rows / 2;
+            cv::Mat up = diffMask(cv::Rect(0, 0, diffMask.cols, hh));
+            cv::Mat bot = diffMask(cv::Rect(0, hh, diffMask.cols, diffMask.rows - hh));
+            plN_ = (cv::countNonZero(up) > cv::countNonZero(bot));
+        } else {
+            plN_ = (accumulatedUp_ > accumulatedBot_);
+        }
+        
+        accumulatedUp_ = 0;
+        accumulatedBot_ = 0;
+        
         card_=card;
         return true;
     }
@@ -221,10 +256,22 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     imgIdx = std::distance(matchCount.begin(),maxCounts);
     if(*maxCounts < 10) {
         if (!templatesLoaded_) loadTemplates();
-        int denari = countDenari(img, mask);
+        std::vector<cv::Rect> denariRects = getDenariRects(img, mask);
+        int denari = denariRects.size();
+        
+        if (denari == 4 && expectedRatio4_ > 0 && expectedRatio6_ > 0) {
+            double r = calculateAspectRatios(denariRects);
+            if (std::abs(r - expectedRatio6_) < std::abs(r - expectedRatio4_)) {
+                denari = 6;
+                std::cout<<"CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 6 DI DENARI (ricostruita dal ratio "<< r <<")"<<std::endl;
+            }
+        }
+        
         if (denari >= 2 && denari <= 7) {
             card = {COINS, denari};
-            std::cout<<"CARTA TROVATA TRAMITE FALLBACK TEMPLATE: " << denari << " DI DENARI"<<std::endl;
+            if (denari != 6 || denariRects.size() != 4) {
+                std::cout<<"CARTA TROVATA TRAMITE FALLBACK TEMPLATE: " << denari << " DI DENARI"<<std::endl;
+            }
             return true;
         }
         return false;
@@ -305,13 +352,7 @@ void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
     img.copyTo(render,dst);
 }
 
-bool Eye::isNordPlaying(const cv::Mat& diffMask)
-{
-    int hh = diffMask.rows/2;
-    cv::Mat up=diffMask(cv::Rect(0, 0, diffMask.cols, hh));
-    cv::Mat bot=diffMask(cv::Rect(0, hh, diffMask.cols, diffMask.rows-hh));
-    return (cv::countNonZero(up)>cv::countNonZero(bot));
-}
+
 
 void Eye::loadTemplates() {
     std::string pathLarge = "../dataset/Briscola_Trentine/3-coins.JPG";
@@ -330,14 +371,39 @@ void Eye::loadTemplates() {
         std::cerr << "EyeError: Impossibile caricare " << pathMedium << std::endl;
     }
     templatesLoaded_ = true;
+
+    // Calcolo dinamico ratio 4 vs 6
+    cv::Mat img4 = cv::imread("../dataset/Briscola_Trentine/4-coins.JPG");
+    cv::Mat img6 = cv::imread("../dataset/Briscola_Trentine/6-coins.JPG");
+    if(!img4.empty() && !img6.empty()) {
+        cv::Mat dummyMask4 = cv::Mat::ones(img4.size(), CV_8UC1) * 255;
+        std::vector<cv::Rect> rects4 = getDenariRects(img4, dummyMask4);
+        if(rects4.size() == 4) {
+            expectedRatio4_ = calculateAspectRatios(rects4);
+            std::cout << ">>> Ratio dinamico calcolato per il 4 di Denari: " << expectedRatio4_ << std::endl;
+        }
+
+        cv::Mat dummyMask6 = cv::Mat::ones(img6.size(), CV_8UC1) * 255;
+        std::vector<cv::Rect> rects6 = getDenariRects(img6, dummyMask6);
+        if(rects6.size() == 6) {
+            // Ordina i rects dal più in alto al più in basso (y minore = più in alto)
+            std::sort(rects6.begin(), rects6.end(), [](const cv::Rect& a, const cv::Rect& b){
+                return a.y < b.y;
+            });
+            // Simuliamo il taglio: prendiamo solo i primi 4
+            std::vector<cv::Rect> top4Rects(rects6.begin(), rects6.begin() + 4);
+            expectedRatio6_ = calculateAspectRatios(top4Rects);
+            std::cout << ">>> Ratio dinamico calcolato per il 6 di Denari (tagliato): " << expectedRatio6_ << std::endl;
+        }
+    }
 }
 
-int Eye::countDenari(const cv::Mat& img, const cv::Mat& mask) {
-    if (templLarge_.empty() || templMedium_.empty()) return 0;
+std::vector<cv::Rect> Eye::getDenariRects(const cv::Mat& img, const cv::Mat& mask) {
+    if (templLarge_.empty() || templMedium_.empty()) return {};
 
     // Troviamo il bounding box della maschera per ottimizzare la ricerca
     cv::Rect roi = cv::boundingRect(mask);
-    if (roi.area() == 0) return 0;
+    if (roi.area() == 0) return {};
     
     // Per sicurezza, allarghiamo leggermente la ROI
     roi.x = std::max(0, roi.x - 20);
@@ -385,7 +451,6 @@ int Eye::countDenari(const cv::Mat& img, const cv::Mat& mask) {
                 if (maxVal < thresholdScore) break;
 
                 // Controllo: il centro del template cade nella zona *solida* della maschera di movimento?
-                // Le ombre sulla Briscola statica verranno scartate perché distrutte dall'erosione.
                 cv::Point center(maxLoc.x + resizedTempl.cols/2, maxLoc.y + resizedTempl.rows/2);
                 if (solidMask.at<uchar>(center.y, center.x) > 128) {
                     all_detections.push_back({cv::Rect(roi.x + maxLoc.x, roi.y + maxLoc.y, resizedTempl.cols, resizedTempl.rows), maxVal});
@@ -405,20 +470,58 @@ int Eye::countDenari(const cv::Mat& img, const cv::Mat& mask) {
         return a.score > b.score;
     });
 
-    std::vector<Detection> final_detections;
+    std::vector<cv::Rect> final_rects;
     for (const auto& det : all_detections) {
         bool keep = true;
-        for (const auto& final_det : final_detections) {
-            int interArea = (det.rect & final_det.rect).area();
-            int unionArea = det.rect.area() + final_det.rect.area() - interArea;
+        for (const auto& final_rect : final_rects) {
+            int interArea = (det.rect & final_rect).area();
+            int unionArea = det.rect.area() + final_rect.area() - interArea;
             double iou = unionArea == 0 ? 0 : (double)interArea / unionArea;
             if (iou > 0.2) { 
                 keep = false;
                 break;
             }
         }
-        if (keep) final_detections.push_back(det);
+        if (keep) final_rects.push_back(det.rect);
     }
 
-    return final_detections.size();
+    return final_rects;
+}
+
+double Eye::calculateAspectRatios(const std::vector<cv::Rect>& rects) {
+    if (rects.size() != 4) return 0.0;
+    
+    std::vector<cv::Point> centers;
+    for(const auto& r : rects) {
+        centers.push_back(cv::Point(r.x + r.width/2, r.y + r.height/2));
+    }
+    
+    double maxDist = 0;
+    int idx1 = 0, idx2 = 0;
+    for(int i = 0; i < 4; i++) {
+        for(int j = i+1; j < 4; j++) {
+            double dist = cv::norm(centers[i] - centers[j]);
+            if(dist > maxDist) {
+                maxDist = dist;
+                idx1 = i;
+                idx2 = j;
+            }
+        }
+    }
+    
+    std::vector<int> others;
+    for(int i = 0; i < 4; i++) {
+        if(i != idx1 && i != idx2) others.push_back(i);
+    }
+    
+    if(others.size() != 2) return 0.0;
+    
+    double edge1 = cv::norm(centers[idx1] - centers[others[0]]);
+    double edge2 = cv::norm(centers[idx1] - centers[others[1]]);
+    
+    double edgeLong = std::max(edge1, edge2);
+    double edgeShort = std::min(edge1, edge2);
+    
+    if (edgeShort == 0) return 0.0;
+    return edgeLong / edgeShort;
 }

@@ -183,6 +183,13 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
 
     watcher->clear(); // reset before the table check, so residualImage_ stays consistent for this round
 
+    cv::VideoCapture baseCap(videoPath);
+    cv::Mat firstF;
+    if(baseCap.isOpened() && baseCap.read(firstF)) {
+        watcher->setBaseline(firstF);
+    }
+    baseCap.release();
+
     // Detects, round by round, whether the trump card has actually been picked
     // up and played. Once confirmed off the table, it never needs checking again this game.
     if (!briscolaPickedUp) {
