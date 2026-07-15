@@ -1,3 +1,10 @@
+/**
+ * @file reporter.h
+ * @brief Header file for the Reporter class, which handles logging, exporting, and evaluating Briscola game rounds.
+ * @author Giovanni Stefanuto
+ */
+
+
 #ifndef REPORTER_H
 #define REPORTER_H
 

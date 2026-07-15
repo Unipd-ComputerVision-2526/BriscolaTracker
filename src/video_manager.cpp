@@ -1,3 +1,9 @@
+/**
+ * @file video_manager.cpp
+ * @author Giovanni Stefanuto
+ */
+
+
 #include "video_manager.h"
 #include <iostream>
 

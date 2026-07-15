@@ -1,3 +1,10 @@
+/**
+ * @file video_manager.h
+ * @brief Header file for the VideoFrameManager class, which handles frame extraction from video streams.
+ * @author Giovanni Stefanuto
+ */
+
+
 #ifndef VIDEO_MANAGER_H
 #define VIDEO_MANAGER_H
 

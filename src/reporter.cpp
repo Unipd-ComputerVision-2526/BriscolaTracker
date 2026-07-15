@@ -1,3 +1,9 @@
+/**
+ * @file reporter.cpp
+ * @author Giovanni Stefanuto
+ */
+
+
 #include "reporter.h"
 #include <fstream>
 #include <sstream>
