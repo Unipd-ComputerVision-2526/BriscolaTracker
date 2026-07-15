@@ -106,6 +106,20 @@ private:
      * @param gameName The name of the current game.
      */
     void playSingleRound(int roundNumber, const std::string& videoPath, const std::string& gameName);
+
+
+    /**
+     * @brief Logs the results of a completed round to the reporter.
+     * 
+     * Constructs a structured data package containing the identified cards, 
+     * the current Briscola, and the round's outcome evaluated by the game engine. 
+     * It then sends this data to the reporter and prints a brief summary to the console.
+     * 
+     * @param roundNumber The current round number.
+     * @param playedCards An array containing the two cards played (index 0 for North, index 1 for South).
+     * @param result The outcome of the round computed by the game engine (winner, leader, and points).
+     */
+    void recordRoundResults(int roundNumber, const Card playedCards[2], const RoundResult& result);
    
 };
 
