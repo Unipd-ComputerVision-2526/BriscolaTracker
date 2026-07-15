@@ -1,3 +1,9 @@
+/**
+ * @file briscola.cpp
+ * @brief Implementation of the class Briscola game logic engine.
+ * @author Caterina Dri
+ */
+
 #include "briscola.h"
 #include <stdexcept>
 #include <string>
@@ -101,7 +107,8 @@ void Briscola::setScores(const std::vector<int>& newScores) {
 }
 
 bool Briscola::isRoundComplete() const {
-    return static_cast<int>(currentRoundCards.size()) == players;
+    int playedCards = static_cast<int>(currentRoundCards.size());
+    return (playedCards == players) ? true : false;
 }
 
 int Briscola::computeRound() {

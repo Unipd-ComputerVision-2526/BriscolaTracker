@@ -1,3 +1,8 @@
+/**
+ * @file main.cpp
+ * @author Caterina Dri
+ */
+
 #include <iostream>
 #include <vector>
 #include <tuple>
