@@ -9,7 +9,7 @@ class Eye
 {
     public:
         // Constructor
-        Eye(int channelNum=3);
+        Eye();
         // Clear match
         void clear();
         // Clear also trained model
@@ -23,25 +23,22 @@ class Eye
         // Fills card with the last recognized card if present, else returns false
         bool getLastCard(std::pair<Suit, int>& card);
         
-        private:
-        // Feature extractor
+    private:
+        // Feature extractors
         cv::Ptr<cv::SIFT> sift_;
         cv::Ptr<cv::AKAZE> akaze_;
-        // Feature Matcher
-        cv::FlannBasedMatcher matcher_;
+        // Feature matchers
+        cv::FlannBasedMatcher fl_matcher_;
         cv::BFMatcher bf_matcher_;
         // Recognized card with suit and value
         std::pair<Suit, int> card_;
         // Vector that contains cards values used for training, useful for the matcher
         std::vector<std::pair<Suit, int>> cardVector_;
-        // Already recognized cards
-        std::vector<std::pair<Suit, int>> recognizedCards_;
         // Last used mask
         cv::Mat lastMask_;
         // Last seen frame;
         cv::Mat residualImage_;
         
-        int channelNum_;
         bool plN_;
 
         bool isValidImage(const cv::Mat& img);
@@ -57,6 +54,8 @@ class Eye
 
         bool siftRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
         bool akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
+
+        int circleCounter(const cv::Mat& img, const cv::Mat& mask);
 };
 
 #endif
