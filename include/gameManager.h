@@ -39,15 +39,14 @@ public:
     ~GameManager();
 
     /**
-     * @brief Main workflow to process all 20 rounds of a full game.
-     * 
-     * Initializes the game state, identifies the Briscola, loops through all 
-     * rounds, and finally calculates the performance metrics against the ground truth.
-     * 
-     * @param gameName The name of the current game to process.
-     * @param baseFolderPath The base directory containing the game videos.
+     * @brief Processes an entire game (20 rounds).
+     
+     * @param gameName The identifier of the game (e.g., "game1").
+     * @param baseFolderPath The path where the game folder is located.
+     * @param showDetailedStats If true, prints detailed suit stats after the game.
+     * @return GameMetrics containing the results of the evaluation against ground truth.
      */
-    void processFullGame(const std::string& gameName, const std::string& baseFolderPath);
+    GameMetrics processFullGame(const std::string& gameName, const std::string& baseFolderPath, bool showDetailedStats = false);
 
 private:
     Eye* watcher;                         ///< Pointer to the shared computer vision system (not owned).

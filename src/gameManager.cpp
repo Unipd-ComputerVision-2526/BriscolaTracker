@@ -36,7 +36,7 @@ GameManager::~GameManager() = default;
 // PUBLIC METHODS
 // ============================================================================
 
-void GameManager::processFullGame(const std::string& gameName, const std::string& baseFolderPath) {
+GameMetrics GameManager::processFullGame(const std::string& gameName, const std::string& baseFolderPath, bool showDetailedStats) {
     std::cout << "\n========================================" << std::endl;
     std::cout << " STARTING ANALYSIS: " << gameName << std::endl;
     std::cout << "========================================" << std::endl;
@@ -77,10 +77,19 @@ void GameManager::processFullGame(const std::string& gameName, const std::string
         playSingleRound(r, videoPath, gameName);
     }
 
-    // Compute and display final evaluation metrics against the ground truth dataset
+    // Computes and prints final metrics by comparing them to the ground truth
     std::string gtPath = baseFolderPath + gameName + "_results.csv";
+    // We should use the CORRECTED csvs if they exist for game1 and game2 like in main.cpp, but let's stick to base logic or adapt it.
+    std::string gtPath2 = baseFolderPath + gameName + "resultsCORRECTED.csv";
+    if (gameName == "game2") {
+        gtPath2 = baseFolderPath + gameName + "resultsCORRECTED 2.csv";
+    }
+    if (std::filesystem::exists(gtPath2)) {
+        gtPath = gtPath2;
+    }
+    
     std::cout << "\n>>> END OF ANALYSIS for " << gameName << ". Final Results:" << std::endl;
-    reporter.calculateMetrics(gtPath);
+    return reporter.calculateMetrics(gtPath, showDetailedStats);
 }
 
 // ============================================================================
@@ -315,3 +324,4 @@ void GameManager::recordRoundResults(int roundNumber, const Card playedCards[2],
               << ". Winner: " << data.winner << " (" << data.points << " pts)" << std::endl;
 }
  
+
