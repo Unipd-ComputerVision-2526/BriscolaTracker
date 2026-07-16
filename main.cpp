@@ -1,8 +1,14 @@
+/**
+ * @file main.cpp
+ * @author Caterina Dri
+ */
+
 #include <iostream>
 #include <vector>
 #include <tuple>
 #include <string>
 #include <filesystem>
+#include <iomanip>
 #include <opencv2/opencv.hpp>
 #include "utils.h"
 #include "eye.h"
@@ -17,12 +23,12 @@ int main(int argc, char* argv[]) {
         } else if (std::string(argv[i]) == "-verbose") {
             verbose = true;
         } else if (std::string(argv[i]) == "-help") {
-            std::cout << "Utilizzo: ./BriscolaTraker [OPZIONI]" << std::endl;
-            std::cout << "Opzioni:" << std::endl;
-            std::cout << "  -stat       Stampa la tabella dettagliata delle metriche dei semi." << std::endl;
-            std::cout << "  -verbose    Mostra log aggiuntivi e dettagli durante l'elaborazione." << std::endl;
-            std::cout << "  -version    Stampa la versione e il logo del progetto." << std::endl;
-            std::cout << "  -help       Mostra questo messaggio di aiuto." << std::endl;
+            std::cout << "Usage: ./BriscolaTracker [OPTIONS]" << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  -stat       Prints the detailed table of suit metrics." << std::endl;
+            std::cout << "  -verbose    Shows additional logs and details during processing." << std::endl;
+            std::cout << "  -version    Prints the version and the project logo." << std::endl;
+            std::cout << "  -help       Shows this help message." << std::endl;
             return 0;
         } else if (std::string(argv[i]) == "-version") {
             std::cout << R"(
@@ -35,8 +41,8 @@ int main(int argc, char* argv[]) {
                                                                       
 )" << '\n';
             std::cout << "BriscolaTracker v1.0" << std::endl;
-            std::cout << "Progetto di Computer Vision - Universita' degli Studi di Padova" << std::endl;
-            std::cout << "Riconoscimento automatico delle carte e del punteggio in una partita di Briscola." << std::endl;
+            std::cout << "Computer Vision Project - University of Padua" << std::endl;
+            std::cout << "Automatic card and score recognition in a game of Briscola." << std::endl;
             return 0;
         }
     }
@@ -51,9 +57,9 @@ int main(int argc, char* argv[]) {
     }
 
     if (verbose) {
-        std::cout << "[VERBOSE] Dataset caricato: " << dataset.size() << " carte totali per il template matching." << std::endl;
+        std::cout << "[VERBOSE] Dataset loaded: " << dataset.size() << " total cards for template matching." << std::endl;
     } else {
-        std::cout << "Dataset caricato: " << dataset.size() << " carte." << std::endl;
+        std::cout << "Dataset loaded: " << dataset.size() << " cards." << std::endl;
     }
 
     Eye watcher;
@@ -83,7 +89,7 @@ int main(int argc, char* argv[]) {
     };
 
     std::cout << "\n========================================" << std::endl;
-    std::cout << " RISULTATI GLOBALI (TUTTI I GAME)" << std::endl;
+    std::cout << " GLOBAL RESULTS (ALL GAMES)" << std::endl;
     std::cout << "========================================" << std::endl;
     std::cout << "Card Recognition Accuracy: " << (totalMetrics.expectedCards > 0 ? (static_cast<double>(totalMetrics.correctCards) / totalMetrics.expectedCards) * 100.0 : 0.0) << "%" << std::endl;
     std::cout << "Player Identification Accuracy: " << (totalMetrics.totalPlayers > 0 ? (static_cast<double>(totalMetrics.correctPlayers) / totalMetrics.totalPlayers) * 100.0 : 0.0) << "%" << std::endl;
@@ -94,11 +100,11 @@ int main(int argc, char* argv[]) {
     if (showDetailedStats) {
         std::cout << "\n--- DETAILED SUIT METRICS (GLOBAL) ---\n";
         std::cout << std::left << std::setw(10) << "SUIT" 
-                  << std::setw(15) << "totale atteso"
-                  << std::setw(20) << "Seme corretto"
-                  << std::setw(25) << "Seme + Numero esatti"
-                  << std::setw(20) << "Seme errato"
-                  << std::setw(20) << "Round incompleto"
+                  << std::setw(15) << "Expected Total"
+                  << std::setw(20) << "Correct Suit"
+                  << std::setw(25) << "Exact Match (Suit+Num)"
+                  << std::setw(20) << "Wrong Suit"
+                  << std::setw(20) << "Incomplete Round"
                   << std::endl;
 
         std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};

@@ -1,14 +1,26 @@
+/**
+ * @file gameManager.cpp
+ * @brief Implementation of the class GameManager for the managing
+ *        Briscola rounds.
+ * @author Caterina Dri
+ */
+
 #include "gameManager.h"
 #include "video_manager.h"
 #include <iostream>
 #include <map>
 #include <stdexcept>
- 
+#include <random>
+
 // Number of the last round in which the static briscola card, still lying on
 // the table, must be ignored if recognized. From round 18 onward it is
 // actually played, so it must be treated as a real played card.
 static constexpr int LastRoundWithBriscolaOnTable = 17;
- 
+
+// ============================================================================
+// CONSTRUCTOR & DESTRUCTOR
+// ============================================================================
+
 GameManager::GameManager(Eye* visionSystem)
     : watcher(visionSystem), gameEngine(), isBriscolaIdentified(false) {
 
@@ -19,213 +31,47 @@ GameManager::GameManager(Eye* visionSystem)
 }
 
 GameManager::~GameManager() = default;
- 
-std::string GameManager::playerIdxToName(int idx) const {
-    return (idx == 0) ? "North" : "South";
-}
- 
-void GameManager::identifyBriscola(const std::string& gameName, const std::string& baseFolderPath) {
-    std::map<std::pair<Suit, int>, int> cardFrequencies;
- 
-    // Analyzes the first 3 rounds
-    for (int r = 1; r <= 3; ++r) {
-        std::string videoPath = baseFolderPath + gameName + "/" + gameName + "round" + std::to_string(r) + ".mp4";
- 
-        // NOTE: Using the 1-argument constructor here restores motion-based frame selection
-        // (frameSkip=10, threshold=5.0 by default). This catches the exact moment a card 
-        // appears/changes instead of sampling arbitrary, evenly spaced frames.
-        VideoFrameManager vfm(videoPath);
- 
-        if (!vfm.isOpened()) {
-            std::cerr << ">>> Warning: Cannot open video for Briscola identification: " << videoPath << std::endl;
-            continue; // If a video is not found, skip and try the next one
-        }
- 
-        cv::Mat frame;
-        int framesAnalyzed = 0;
-        watcher->clear();
- 
-        // Reads up to 20 frames for each of the 3 videos (60 frames total)
-        while (framesAnalyzed < 20 && vfm.getNextInterestingFrame(frame)) {
-            std::pair<Suit, int> recognizedCard;
-            if (watcher->recognize(frame, recognizedCard)) {
-                cardFrequencies[recognizedCard]++;
-            }
-            framesAnalyzed++;
-        }
-    }
- 
-    // Finds the card with the highest frequency across all 3 rounds
-    int maxFreq = -1;
-    std::pair<Suit, int> bestCard;
-    for (const std::pair<const std::pair<Suit, int>, int>& pair: cardFrequencies) {
-        if (pair.second > maxFreq) {
-            maxFreq = pair.second;
-            bestCard = pair.first;
-        }
-    }
- 
-    if (maxFreq > 0) {
-        currentBriscolaCard.suit = bestCard.first;
-        currentBriscolaCard.number = bestCard.second;
-        isBriscolaIdentified = true;
- 
-        // Initializes the game engine with the identified briscola
-        gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
- 
-        std::cout << ">>> Briscola correctly identified: "
-                  << currentBriscolaCard.number << " of " << currentBriscolaCard.suit
-                  << " (seen in " << maxFreq << " frames across first 3 rounds)" << std::endl;
-    } else {
-        std::cerr << ">>> ERROR: Could not identify any card as Briscola in the first 3 rounds!" << std::endl;
-    }
-}
 
-void GameManager::playSingleRound(int roundNumber, const std::string& videoPath, const std::string& gameName) {
-    // Same approach as in identifyBriscola: use the 1-argument constructor to 
-    // enable motion-based frame selection.
-    VideoFrameManager vfm(videoPath);
-    if (!vfm.isOpened()) {
-        std::cerr << ">>> ERROR: Cannot open video for round"
-                << roundNumber << " to path: " << videoPath << std::endl;
-        return;
-    }
- 
-    watcher->clear(); // Resets the eye for the new video
-    cv::Mat frame;
-    std::pair<Suit, int> recognizedCard;
- 
-    // NOTE: North/South is no longer inferred from "which card was recognized first",
-    // as that approach silently inverted North and South whenever a single prior round
-    // was misjudged (the error propagated forward).
-    // Instead, each recognized card is tagged with its actual physical side via 
-    // watcher->wasNordActive(). This makes each round self-contained: a bad recognition 
-    // in one round cannot corrupt the North/South assignment of any other round.
-    bool foundNorth = false;
-    bool foundSouth = false;
-    Card northCard{};
-    Card southCard{};
-    bool leaderKnown = false;
-    Player leader = Player::North; // Overwritten as soon as the first card of the round is found
- 
-    std::cout << "\n--- Round " << roundNumber << " ---" << std::endl;
- 
-    while (vfm.getNextInterestingFrame(frame)) {
-        if (watcher->recognize(frame, recognizedCard)) {
-            bool isTheStaticBriscola = (recognizedCard.first == currentBriscolaCard.suit &&
-                                        recognizedCard.second == currentBriscolaCard.number);
- 
-            // In Briscola, the static trump card on the table is only picked up and played
-            // during the final 3 rounds. Therefore, if we see it in rounds 1 to 17,
-            // it is just the card lying on the table and must be ignored.
-            if (isTheStaticBriscola && roundNumber <= LastRoundWithBriscolaOnTable) {
-                continue;
-            }
- 
-            bool isNorthCard = watcher->wasNordActive();
-            Card card{recognizedCard.first, recognizedCard.second};
- 
-            // NOTE: The deck has no duplicate cards, so North and South can never
-            // legitimately play the same suit+number in the same round. If the candidate
-            // for one side matches the card already locked in for the OTHER side, it must 
-            // be a re-detection of the same physical card (e.g., residual motion trail). 
-            // We discard it rather than recording an impossible duplicate.
-            if (isNorthCard && foundSouth && card.suit == southCard.suit && card.number == southCard.number) {
-                continue;
-            }
-            if (!isNorthCard && foundNorth && card.suit == northCard.suit && card.number == northCard.number) {
-                continue;
-            }
- 
-            if (isNorthCard) {
-                if (foundNorth) continue; // North's card already locked in; ignores further detections
-                northCard = card;
-                foundNorth = true;
-                if (!leaderKnown) { 
-                    leader = Player::North; 
-                    leaderKnown = true; 
-                }
-                std::cout << "Recognized North card: " << card.number << " of " << card.suit << std::endl;
-            } else {
-                if (foundSouth) continue; // South's card already locked in; ignores further detections
-                southCard = card;
-                foundSouth = true;
-                if (!leaderKnown) { 
-                    leader = Player::South; 
-                    leaderKnown = true; 
-                }
-                std::cout << "Recognized South card: " << card.number << " of " << card.suit << std::endl;
-            }
- 
-            // Break early as soon as we have both played cards
-            if (foundNorth && foundSouth) break;
-        }
-    }
- 
-    if (foundNorth && foundSouth) {
-        // Passes the structured cards to the game engine.
-        // Wrapped in try/catch: a single misrecognized card (e.g., an invalid number 
-        // from a noisy frame) should not abort the whole game analysis.
-        try {
-            RoundResult result = gameEngine->playRound(northCard, southCard, leader);
- 
-            // Populates data for the Reporter
-            RoundData data;
-            data.round = roundNumber;
-            data.briscolaNumber = currentBriscolaCard.number;
-            data.briscolaSuit = currentBriscolaCard.suit;
-            data.leader = playerIdxToName(static_cast<int>(result.leader));
- 
-            data.northNumber = northCard.number;
-            data.northSuit = northCard.suit;
-            data.southNumber = southCard.number;
-            data.southSuit = southCard.suit;
- 
-            data.winner = playerIdxToName(static_cast<int>(result.winner));
-            data.points = result.points;
- 
-            reporter.logRound(data);
-            std::cout << "Round " << roundNumber << " FINISHED. Leader: " << data.leader
-                      << ". Winner: " << data.winner << " (" << data.points << " pts)" << std::endl;
-        } catch (const std::exception& e) {
-            std::cerr << ">>> ERROR: Round " << roundNumber
-                      << " could not be resolved (" << e.what() << "). Skipping." << std::endl;
-        }
-    } else {
-        std::cout << "ERROR: Round " << roundNumber << " incomplete (North: "
-                  << (foundNorth ? "found" : "missing") << ", South: "
-                  << (foundSouth ? "found" : "missing") << ")" << std::endl;
-    }
-}
- 
-// Main workflow to process all 20 rounds of a game
+// ============================================================================
+// PUBLIC METHODS
+// ============================================================================
+
 GameMetrics GameManager::processFullGame(const std::string& gameName, const std::string& baseFolderPath, bool showDetailedStats) {
     std::cout << "\n========================================" << std::endl;
     std::cout << " STARTING ANALYSIS: " << gameName << std::endl;
     std::cout << "========================================" << std::endl;
  
+    // Reset internal state, engine, and reporting history from any previously analyzed games
     isBriscolaIdentified = false;
- 
-    // Clears any previous game state
+    briscolaPickedUp = false;
     gameEngine.reset();
+    reporter.clear();
 
-    // Clears the history from the previous game
-    reporter.clear(); // We must ensure reporter.clear() exists, actually reporter didn't have clear()!
-    // Wait, let's just create a new reporter if we can, or just assume it has clear() if it's there.
-    // I'll keep the original code for clearing.
-
-    // Identifies the briscola BEFORE looping through the played rounds,
-    // ensuring the trump suit is ready from the start.
+    // Identify the Briscola card before processing rounds to configure the game engine's trump suit
     identifyBriscola(gameName, baseFolderPath);
 
+    // Fallback: If the vision system fails to find the Briscola, generate a random valid card.
+    // This ensures the game engine can still initialize and track standard card drops, 
+    // preserving basic card and player recognition metrics despite the missing trump context.
     if (!isBriscolaIdentified) {
-        std::cerr << "Cannot proceed without Briscola. Skipping game." << std::endl;
-        return GameMetrics();
+        std::cerr << ">>> WARNING: Cannot identify Briscola. Generating a random Card to continue the analysis." << std::endl;
+        
+        std::srand(std::time(nullptr));
+        
+        int randomSuit = (std::rand() % 4) + 1; 
+        
+        int randomNumber = (std::rand() % 10) + 1;
+        
+        currentBriscolaCard.suit = static_cast<Suit>(randomSuit);
+        currentBriscolaCard.number = randomNumber;
+        
+        // Initialize the game engine with the randomly generated Briscola
+        gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
     }
 
-    // Processes all 20 rounds
+    // Process all 20 rounds of a standard Briscola match
     for (int r = 1; r <= 20; ++r) {
-        std::string videoPath = baseFolderPath + gameName + "/" + gameName + "round" + std::to_string(r) + ".mp4";
+        std::string videoPath = buildRoundVideoPath(baseFolderPath, gameName, r);
 
         // Plays and evaluates the round
         playSingleRound(r, videoPath, gameName);
@@ -245,3 +91,237 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
     std::cout << "\n>>> END OF ANALYSIS for " << gameName << ". Final Results:" << std::endl;
     return reporter.calculateMetrics(gtPath, showDetailedStats);
 }
+
+// ============================================================================
+// PRIVATE METHODS
+// ============================================================================
+
+std::string GameManager::playerIdxToName(int idx) const {
+    std::string playerName;
+    playerName = (idx == 0) ? "North" : "South";
+    return playerName;
+}
+
+std::string GameManager::buildRoundVideoPath(const std::string& baseFolderPath, const std::string& gameName, int round) const {
+    std::string videoPath = baseFolderPath + gameName + "/" + gameName + "round" + std::to_string(round) + ".mp4";
+    return videoPath;
+}
+
+bool GameManager::isBriscolaStillOnTable(const std::string& videoPath) {
+    cv::VideoCapture cap(videoPath);
+    if (!cap.isOpened()) {
+        return true; // can't verify: conservative default, avoid a false play
+    }
+
+    cv::Mat frame;
+    int framesToCheck = 10; 
+    int framesAnalyzed = 0;
+
+    // Check only the first few frames to optimize performance. 
+    // If the static Briscola is on the table, it should be immediately visible.
+    while (framesAnalyzed < framesToCheck) {
+        cap >> frame;
+        if (frame.empty()) {
+            break; 
+        }
+
+        std::pair<Suit, int> recognized;
+        // If the detected card matches the known Briscola, it hasn't been drawn yet
+        if (watcher->recognize(frame, recognized)) {
+            if (recognized.first == currentBriscolaCard.suit && 
+                recognized.second == currentBriscolaCard.number) {
+                return true; 
+            }
+        }
+        framesAnalyzed++;
+    }
+
+    // If the Briscola is not found in the initial frames, a player must have picked it up
+    return false;
+}
+ 
+void GameManager::identifyBriscola(const std::string& gameName, const std::string& baseFolderPath) {
+    std::map<std::pair<Suit, int>, int> cardFrequencies;
+
+    int roundsToAnalyze = 5;
+ 
+    // Analyze the first frame of the initial rounds to identify the static Briscola on the table
+    for (int r = 1; r <= roundsToAnalyze; ++r) {
+        std::string videoPath = buildRoundVideoPath(baseFolderPath, gameName, r);
+ 
+        VideoFrameManager vfm(videoPath, 1);
+ 
+        if (!vfm.isOpened()) {
+            std::cerr << ">>> Warning: Cannot open video for Briscola identification: " << videoPath << std::endl;
+            continue; 
+        }
+ 
+        cv::Mat firstFrame;
+ 
+        if (vfm.getNextInterestingFrame(firstFrame)) {
+            
+            watcher->clear();
+     
+            std::pair<Suit, int> recognizedCard;
+
+            if (watcher->recognize(firstFrame, recognizedCard)) {
+                cardFrequencies[recognizedCard]++;
+            }
+        } else {
+            std::cerr << ">>> Warning: Could not extract frame for video: " << videoPath << std::endl;
+        }
+    }
+ 
+    // Select the most frequently detected card to mitigate single-frame recognition errors
+    int maxFreq = -1;
+    std::pair<Suit, int> bestCard;
+    for (const std::pair<const std::pair<Suit, int>, int>& pair: cardFrequencies) {
+        if (pair.second > maxFreq) {
+            maxFreq = pair.second;
+            bestCard = pair.first;
+        }
+    }
+ 
+    if (maxFreq > 0) {
+        currentBriscolaCard.suit = bestCard.first;
+        currentBriscolaCard.number = bestCard.second;
+        isBriscolaIdentified = true;
+ 
+        // Initializes the game engine with the identified Briscola suit
+        gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
+ 
+        std::cout << ">>> Briscola correctly identified: "
+                  << currentBriscolaCard.number << " of " << currentBriscolaCard.suit
+                  << " (seen in " << maxFreq << " frames across first " << roundsToAnalyze << " rounds)" << std::endl;
+    } else {
+        std::cerr << ">>> ERROR: Could not identify any card as Briscola in the firsts rounds!" << std::endl;
+    }
+}
+
+void GameManager::playSingleRound(int roundNumber, const std::string& videoPath, const std::string& gameName) {
+
+    // Initialize VideoFrameManager with motion-based selection to skip static frames
+    VideoFrameManager vfm(videoPath);
+    if (!vfm.isOpened()) {
+        std::cerr << ">>> ERROR: Cannot open video for round"
+                << roundNumber << " to path: " << videoPath << std::endl;
+        return;
+    }
+
+    // Clear vision system state to prevent contamination from previous rounds
+    watcher->clear(); 
+
+    // Track if the static Briscola on the table has been drawn
+    if (roundNumber <= LastRoundWithBriscolaOnTable) {
+        briscolaPickedUp = false;
+    }else{
+        if (!briscolaPickedUp) {
+            briscolaPickedUp = !isBriscolaStillOnTable(videoPath);
+        }
+    }
+
+    cv::Mat frame;
+    std::pair<Suit, int> recognizedCard;
+
+    // State tracking: index 0 = North, index 1 = South
+    bool found[2] = {false, false};
+    Card playedCards[2];
+    bool leaderKnown = false;
+    Player leader = Player::North;
+
+    std::cout << "\n--- Round " << roundNumber << " ---" << std::endl;
+
+    while (vfm.getNextInterestingFrame(frame)) {
+        if (watcher->recognize(frame, recognizedCard)) {
+            bool isTheStaticBriscola = (recognizedCard.first == currentBriscolaCard.suit &&
+                                        recognizedCard.second == currentBriscolaCard.number);
+
+            // Ignore the static Briscola on the table until it is actually drawn
+            if (isTheStaticBriscola && !briscolaPickedUp) {
+                continue;
+            }
+
+            // Determine player indices
+            int myIdx = watcher->wasNordActive() ? 0 : 1;
+            int otherIdx = 1 - myIdx; 
+            Card card{recognizedCard.first, recognizedCard.second};
+
+            // Duplicate Prevention: Discard the card if it matches the other player's 
+            // locked card to avoid motion trail or tracking artifacts.
+            if (found[otherIdx] && card.suit == playedCards[otherIdx].suit && card.number == playedCards[otherIdx].number) {
+                continue;
+            }
+
+            // Player Swap Correction: If the current player's slot is full but a new card 
+            // is detected, attribute it to the other player (handles crossed hands).
+            if (found[myIdx]) {
+                if (card.suit != playedCards[myIdx].suit || card.number != playedCards[myIdx].number) {
+                    
+                    if (!found[otherIdx]) {
+                        playedCards[otherIdx] = card;
+                        found[otherIdx] = true;
+                    }
+                }
+                continue; 
+            }
+
+            // Lock-in & Leader Assignment
+            playedCards[myIdx] = card;
+            found[myIdx] = true;
+            
+            // The first player to drop a valid card becomes the leader
+            if (!leaderKnown) { 
+                leader = (myIdx == 0) ? Player::North : Player::South; 
+                leaderKnown = true; 
+            }
+            
+            std::cout << "Recognized " << playerIdxToName(myIdx) << " card: " 
+                      << card.number << " of " << card.suit << std::endl;
+
+            // Stop processing once both cards are found
+            if (found[0] && found[1]) break;
+        }
+    }
+
+    if (found[0] && found[1]) {
+        try {
+            RoundResult result = gameEngine->playRound(playedCards[0], playedCards[1], leader);
+            
+            // Calls the helper function to pack and send data to reporter
+            recordRoundResults(roundNumber, playedCards, result);
+
+        } catch (const std::exception& e) {
+            std::cerr << ">>> ERROR: Round " << roundNumber
+                      << " could not be resolved (" << e.what() << "). Skipping." << std::endl;
+        }
+    } else {
+        std::cout << "ERROR: Round " << roundNumber << " incomplete (North: "
+                  << (found[0] ? "found" : "missing") << ", South: "
+                  << (found[1] ? "found" : "missing") << ")" << std::endl;
+    }
+}
+
+void GameManager::recordRoundResults(int roundNumber, const Card playedCards[2], const RoundResult& result) {
+    RoundData data;
+    data.round = roundNumber;
+    data.briscolaNumber = currentBriscolaCard.number;
+    data.briscolaSuit = currentBriscolaCard.suit;
+    
+    // Populates player decisions and game outcomes
+    data.leader = playerIdxToName(static_cast<int>(result.leader));
+    data.northNumber = playedCards[0].number;
+    data.northSuit = playedCards[0].suit;
+    data.southNumber = playedCards[1].number;
+    data.southSuit = playedCards[1].suit;
+
+    data.winner = playerIdxToName(static_cast<int>(result.winner));
+    data.points = result.points;
+
+    // Sends the structured data to the reporter
+    reporter.logRound(data);
+    
+    std::cout << "Round " << roundNumber << " FINISHED. Leader: " << data.leader
+              << ". Winner: " << data.winner << " (" << data.points << " pts)" << std::endl;
+}
+ 
+

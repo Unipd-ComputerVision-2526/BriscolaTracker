@@ -1,80 +1,144 @@
+/**
+ * @file briscola.h
+ * @brief Definition of the Briscola game logic engine.
+ * @author Caterina Dri
+ */
+
 #ifndef BRISCOLA_H
 #define BRISCOLA_H
+
 #include <vector>
 #include "utils.h"
 
-// Represents the two players: North = 0, South = 1.
+/**
+ * @enum Player
+ * @brief Represents the two players in the game.
+ */
 enum class Player {
     North = 0,
     South = 1
 };
 
-// Represents a single card with its suit and rank number
+/**
+ * @struct Card
+ * @brief Represents a single playing card.
+ */
 struct Card {
-    Suit suit;
-    int number;
+    Suit suit;   /**< The suit of the card (e.g., Coins, Cups, Swords, Clubs) */
+    int number;  /**< The rank/number of the card (1 to 10) */
 };
 
-// Contains the result of a single round
+/**
+ * @struct RoundResult
+ * @brief Contains the outcome of a single played round.
+ */
 struct RoundResult {
-    Player leader;
-    Player winner;
-    int points;
+    Player leader; /**< The player who led the round (played the first card) */
+    Player winner; /**< The player who won the round */
+    int points;    /**< The total points scored in this round */
 };
 
+/**
+ * @class Briscola
+ * @brief Core engine handling the rules, turns, and scoring of a Briscola game.
+ */
 class Briscola {
 public:
-    // Initializes the game with a given briscola suit and number of players (default 2)
+    /**
+     * @brief Initializes the game with a given briscola suit and number of players.
+     * 
+     * @param suit The trump suit (Briscola) for the current game.
+     * @param players The number of players (defaults to 2).
+     */
     Briscola(Suit suit, int players = 2);
 
-    // Plays a complete round using the cards already associated with North and South,
-    // and specifies the player who led this round
+    /**
+     * @brief Plays a complete round using the cards associated with North and South.
+     * 
+     * @param northCard The card played by the North player.
+     * @param southCard The card played by the South player.
+     * @param leader The player who leads this round.
+     * @return RoundResult The structured result containing the leader, winner, and points scored.
+     */
     RoundResult playRound(const Card& northCard, const Card& southCard, Player leader);
 
-    // Returns the current scores of the players
+    /**
+     * @brief Retrieves the current scores of all players.
+     * 
+     * @return std::vector<int> A vector containing the players' scores.
+     */
     std::vector<int> getScores() const;
 
-    // Returns the suit of the briscola (trump suit).
+    /**
+     * @brief Retrieves the suit of the briscola (trump suit) for this game.
+     * 
+     * @return Suit The trump suit.
+     */
     Suit getBriscolaSuit() const;
 
-    // Returns the index of the player who will lead the next round.
-    // Note: Undefined before the first round is played
+    /**
+     * @brief Retrieves the index of the player who will lead the next round.
+     * 
+     * @note This value is undefined before the first round is completely played.
+     * @return int The index of the next leading player.
+     */
     int getNextFirstPlayer() const { return nextFirstPlayer; }
 
-    // Returns the points of the last completed round
+    /**
+     * @brief Retrieves the points scored in the most recently completed round.
+     * 
+     * @return int The points of the last round.
+     */
     int getLastRoundPoints() const { return lastRoundPoints; }
 
 private:
-    // Updates the scores of the players with the provided values
+    /**
+     * @brief Updates the scores of the players with the provided values.
+     * 
+     * @param newScores A vector containing the updated scores.
+     */
     void setScores(const std::vector<int>& newScores);
 
-    // Checks if the current round is complete (i.e., all players have played a card)
+    /**
+     * @brief Checks if the current round is complete.
+     * 
+     * A round is considered complete when all players have played a card.
+     * 
+     * @return true if the round is complete, false otherwise.
+     */
     bool isRoundComplete() const;
 
-    // Computes the winner of the round, calculates points, and updates the scores
+    /**
+     * @brief Computes the winner of the round, calculates points, and updates the scores.
+     * 
+     * @return int The index of the winning player.
+     */
     int computeRound();
 
-    // Converts a player index (0/1) to the corresponding Player enum value
+    /**
+     * @brief Converts a numeric player index to the corresponding Player enum value.
+     * 
+     * @param index The numeric index (0 or 1).
+     * @return Player The corresponding Player enum (North or South).
+     */
     Player indexToPlayer(int index) const;
 
-    // Number of players in the game (only 2 supported: North, South)
-    int players;
+    int players;         /**< Number of players in the game (only 2 supported: North, South). */
+    int nextFirstPlayer; /**< Index of the player who leads the current or next round. Set explicitly by playRound(). */
+    int lastRoundPoints; /**< Points scored in the most recently completed round. */
+    Suit briscolaSuit;   /**< The briscola (trump suit) of the current game. */
 
-    // Index of the player who leads the current or next round. 
-    // Set explicitly by playRound() each time
-    int nextFirstPlayer;
-
-    // Points scored in the most recently completed round
-    int lastRoundPoints;
-
-    // The briscola (trump suit) of the current game 
-    Suit briscolaSuit;
-
-    // Cards played in the current round (suit and rank).
-    // The first element is always the card played by the leader.
+    /**
+     * @brief Cards played in the current round.
+     * 
+     * The first element is always the card played by the leader.
+     */
     std::vector<std::pair<Suit, int>> currentRoundCards;
 
-    // Current scores of the players, for the entire game.
+    /**
+     * @brief Current accumulated scores of the players for the entire game.
+     */
     std::vector<int> scores;
 };
+
 #endif //BRISCOLA_H
