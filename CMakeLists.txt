@@ -19,6 +19,7 @@ add_executable(${PROJECT_NAME}
     src/reporter.cpp
     src/briscola.cpp
     src/gameManager.cpp
+    src/templateCoinMatcher.cpp
     )
 
 #add_executable(test_refactoring

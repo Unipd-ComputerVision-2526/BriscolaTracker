@@ -13,6 +13,20 @@ void Eye::clear()
 {
     residualImage_ =cv::Mat();
     lastMask_ = cv::Mat();
+    accumulatedUp_ = 0;
+    accumulatedBot_ = 0;
+}
+
+void Eye::setBaseline(const cv::Mat& img)
+{
+    if (img.empty()) return;
+    cv::Mat rescaled, mask;
+    cv::resize(img, rescaled, cv::Size(img.cols/3, img.rows/3));
+    if(findCardPosition(rescaled, mask)) {
+        cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
+        lastMask_ = mask.clone();
+        residualImage_ = img.clone();
+    }
 }
 
 void Eye::reset()
@@ -25,7 +39,8 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
 {
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::Mat> channels, trainReadyDesc;
-    cv::Mat descriptors, si_all_descriptors, ak_all_descriptors, sift_ready, akaze_ready;
+    cv::Mat img_cp, descriptors, si_all_descriptors, ak_all_descriptors, akaze_ready;
+    cv::Mat templMedium_,templLarge_;
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset){
         if(!isValidImage(std::get<0>(card)))
@@ -34,8 +49,9 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset)
     {
+        img_cp=std::get<0>(card).clone();
         std::pair<Suit, int> p={std::get<1>(card), std::get<2>(card)};
-        preprocessImage(std::get<0>(card), akaze_ready);
+        preprocessImage(img_cp, akaze_ready);
 
         sift_->detectAndCompute(std::get<0>(card), cv::noArray(), keypoints, descriptors);
         if(!descriptors.empty())
@@ -59,14 +75,38 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
         cardVector_.push_back(p);
         si_all_descriptors.release();
         ak_all_descriptors.release();
+
+        if(p.first==Suit::COINS)
+        {
+            switch(p.second)
+            {
+                case 3:
+                    templLarge_ = img_cp(cv::Rect(222, 84, 127, 131)).clone();
+                    break;
+                case 4:
+                    coin4=img_cp.clone();
+                    break;
+                case 6:
+                    coin6=img_cp.clone();
+                    break;
+                case 7:
+                    templMedium_ = img_cp(cv::Rect(406, 47, 94, 89)).clone();
+                    break;
+            }
+            if(!templLarge_.empty() && !templMedium_.empty())
+                templatesLoaded_ = true;
+        }
     }
     fl_matcher_.train();
-
+    
     if (!isValidModelState())
     {
         reset();
         throw std::invalid_argument("EyeError: Dataset not usable for a Briscola match.");
     }
+
+    tc_matcher_.addTemplates(templLarge_,templMedium_);
+    tc_matcher_.computeRatio(coin4,coin6);
 }
 
 bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
@@ -77,10 +117,11 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
         throw std::invalid_argument("EyeError: The image has not the right file format. GBR images needed.");
     
     cv::Mat diffMask;
+    bool found = recognizeCard(image,card,diffMask);
+    accumulateMotion(diffMask, found);
 
-    if(recognizeCard(image,card,diffMask))
+    if(found)
     {
-        plN_=isNordPlaying(diffMask);
         card_=card;
         return true;
     }
@@ -182,11 +223,10 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
     z_score = (channels[2]-mean)/stddev;
     cv::threshold(z_score,mask_lights,0.97,255,cv::THRESH_BINARY);
 
-    mask_out = mask_lights+mask_high_sat;
+    mask_lights = mask_lights+mask_high_sat;
 
-    cv::findContours(mask_out,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
-    cv::morphologyEx(mask_out, mask_out, cv::MORPH_CLOSE, kernel_7);
-    mask_out = cv::Mat::zeros(mask_high_sat.size(), CV_8UC1);
+    cv::findContours(mask_lights,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+    mask_out = cv::Mat::zeros(mask_lights.size(), CV_8UC1);
     for(int i=0; i<contours.size();i++)
     {
         if(cv::contourArea(contours[i])>800)
@@ -213,6 +253,9 @@ bool Eye::findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit,
     result=siftRecognition(sift_ready, mask, card);
     if(!result){
         result=akazeRecognition(akaze_ready, mask, card);
+    }
+    if(!result){
+        result = tc_matcher_.match(img, mask, card);
     }
 
     return result;
@@ -282,12 +325,21 @@ void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
     cv::dilate(dst,dst,kernel_5);
 }
 
-bool Eye::isNordPlaying(const cv::Mat& diffMask)
+void Eye::accumulateMotion(const cv::Mat& diffMask, bool reset)
 {
-    int thresh_h = 3*diffMask.rows/5;
-    cv::Mat up=diffMask(cv::Rect(0, 0, diffMask.cols, thresh_h));
-    cv::Mat bot=diffMask(cv::Rect(0, diffMask.rows-thresh_h, diffMask.cols, thresh_h));
-    return (cv::countNonZero(up)>cv::countNonZero(bot));
+    int zone_sep = 2*diffMask.rows/5;
+    cv::Mat up=diffMask(cv::Rect(0, 0, diffMask.cols, zone_sep));
+    cv::Mat bot=diffMask(cv::Rect(0, diffMask.rows-zone_sep, diffMask.cols, zone_sep));
+    
+    accumulatedUp_ += cv::countNonZero(up);
+    accumulatedBot_ += cv::countNonZero(bot);
+    
+    if(reset){
+        plN_=accumulatedUp_>accumulatedBot_;
+        accumulatedUp_ = 0;
+        accumulatedBot_ = 0;
+    }
+    
 }
 
 bool Eye::siftRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
@@ -324,6 +376,8 @@ bool Eye::siftRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int
         return false;
 
     card = cardVector_[imgIdx];
+    std::cout<<"recognized by sift"<<std::endl;
+
     return true;
 }
 
@@ -383,6 +437,8 @@ bool Eye::akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, in
                 card.second=cardVector_[imgIdx].second;
         }
     }
+
+    std::cout<<"recognized by akaze"<<std::endl;
 
     return true;
 }
