@@ -10,7 +10,8 @@
 #include <iostream>
 #include <map>
 #include <stdexcept>
-#include <random>
+#include <cstdlib>
+#include <ctime>
 
 // Number of the last round in which the static briscola card, still lying on
 // the table, must be ignored if recognized. From round 18 onward it is
@@ -50,25 +51,6 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
     // Identify the Briscola card before processing rounds to configure the game engine's trump suit
     identifyBriscola(gameName, baseFolderPath);
 
-    // Fallback: If the vision system fails to find the Briscola, generate a random valid card.
-    // This ensures the game engine can still initialize and track standard card drops, 
-    // preserving basic card and player recognition metrics despite the missing trump context.
-    if (!isBriscolaIdentified) {
-        std::cerr << ">>> WARNING: Cannot identify Briscola. Generating a random Card to continue the analysis." << std::endl;
-        
-        std::srand(std::time(nullptr));
-        
-        int randomSuit = (std::rand() % 4) + 1; 
-        
-        int randomNumber = (std::rand() % 10) + 1;
-        
-        currentBriscolaCard.suit = static_cast<Suit>(randomSuit);
-        currentBriscolaCard.number = randomNumber;
-        
-        // Initialize the game engine with the randomly generated Briscola
-        gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
-    }
-
     // Process all 20 rounds of a standard Briscola match
     for (int r = 1; r <= 20; ++r) {
         std::string videoPath = buildRoundVideoPath(baseFolderPath, gameName, r);
@@ -77,15 +59,27 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
         playSingleRound(r, videoPath, gameName);
     }
 
+    // Export data round to csv
+    
+    std::string outCsvPath = baseFolderPath + gameName + "_output.csv";
+    reporter.exportCSV(outCsvPath);
+    std::cout << ">>> Exported tracker results to: " << outCsvPath << std::endl;
+
     // Computes and prints final metrics by comparing them to the ground truth
     std::string gtPath = baseFolderPath + gameName + "_results.csv";
-    // We should use the CORRECTED csvs if they exist for game1 and game2 like in main.cpp, but let's stick to base logic or adapt it.
-    std::string gtPath2 = baseFolderPath + gameName + "resultsCORRECTED.csv";
-    if (gameName == "game2") {
-        gtPath2 = baseFolderPath + gameName + "resultsCORRECTED 2.csv";
-    }
-    if (std::filesystem::exists(gtPath2)) {
-        gtPath = gtPath2;
+    // Since the ground truth data provided have different names and have been 
+    // corrected, we added multiple options to dynamically find the right file.
+    std::vector<std::string> possibleCorrectedNames = {
+        baseFolderPath + gameName + "_results_corrected.csv", // Ideal format
+        baseFolderPath + gameName + "resultsCORRECTED.csv",   // Legacy format (no underscore)
+        baseFolderPath + gameName + "resultsCORRECTED 2.csv"  // Legacy format (with space)
+    };
+
+    for (const std::string& checkPath : possibleCorrectedNames) {
+        if (std::filesystem::exists(checkPath)) {
+            gtPath = checkPath;
+            break; 
+        }
     }
     
     std::cout << "\n>>> END OF ANALYSIS for " << gameName << ". Final Results:" << std::endl;
@@ -139,7 +133,8 @@ bool GameManager::isBriscolaStillOnTable(const std::string& videoPath) {
     // If the Briscola is not found in the initial frames, a player must have picked it up
     return false;
 }
- 
+
+
 void GameManager::identifyBriscola(const std::string& gameName, const std::string& baseFolderPath) {
     std::map<std::pair<Suit, int>, int> cardFrequencies;
 
@@ -172,30 +167,55 @@ void GameManager::identifyBriscola(const std::string& gameName, const std::strin
         }
     }
  
+    int suitCounts[5] = {0, 0, 0, 0, 0};
+
     // Select the most frequently detected card to mitigate single-frame recognition errors
     int maxFreq = -1;
     std::pair<Suit, int> bestCard;
-    for (const std::pair<const std::pair<Suit, int>, int>& pair: cardFrequencies) {
-        if (pair.second > maxFreq) {
-            maxFreq = pair.second;
-            bestCard = pair.first;
+    
+    for (const std::pair<const std::pair<Suit, int>, int>& entry : cardFrequencies) {
+        if (entry.second > maxFreq) {
+            maxFreq = entry.second;
+            bestCard = entry.first; 
+        }
+        // Accumulate counts for the suit (entry.first.first è il seme)
+        suitCounts[entry.first.first] += entry.second;
+    }
+
+    // Determine the most frequent suit from accumulated counts
+    int maxSuitFreq = -1;
+    Suit bestSuit = COINS;
+    for (int s = 1; s <= 4; s++) {
+        if (suitCounts[s] > maxSuitFreq) {
+            maxSuitFreq = suitCounts[s];
+            bestSuit = static_cast<Suit>(s);
         }
     }
  
+    std::srand(std::time(nullptr));
+
+    // Fallback hierarchy: 
+    // 1. Full card identified -> 2. Only suit identified -> 3. Total random
     if (maxFreq > 0) {
-        currentBriscolaCard.suit = bestCard.first;
+        currentBriscolaCard.suit = bestCard.first;  
         currentBriscolaCard.number = bestCard.second;
         isBriscolaIdentified = true;
- 
-        // Initializes the game engine with the identified Briscola suit
-        gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
- 
-        std::cout << ">>> Briscola correctly identified: "
-                  << currentBriscolaCard.number << " of " << currentBriscolaCard.suit
-                  << " (seen in " << maxFreq << " frames across first " << roundsToAnalyze << " rounds)" << std::endl;
-    } else {
-        std::cerr << ">>> ERROR: Could not identify any card as Briscola in the firsts rounds!" << std::endl;
+        std::cout << ">>> Briscola fully identified: " << bestCard.second << " of " << bestCard.first << std::endl;
+    } 
+    else if (maxSuitFreq > 0) {
+        currentBriscolaCard.suit = bestSuit;
+        currentBriscolaCard.number = (std::rand() % 10) + 1; // Random number, correct suit
+        isBriscolaIdentified = false;
+        std::cout << ">>> Briscola SUIT identified: " << bestSuit << " (Number guessed randomly)" << std::endl;
+    } 
+    else {
+        currentBriscolaCard.suit = static_cast<Suit>((std::rand() % 4) + 1);
+        currentBriscolaCard.number = (std::rand() % 10) + 1;
+        isBriscolaIdentified = false;
+        std::cout << ">>> ERROR: Could not identify Briscola. Generating totally random card." << std::endl;
     }
+
+    gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
 }
 
 void GameManager::playSingleRound(int roundNumber, const std::string& videoPath, const std::string& gameName) {
@@ -241,8 +261,18 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
                 continue;
             }
 
-            // Determine player indices
-            int myIdx = watcher->wasNordActive() ? 0 : 1;
+            // Determine player indices and perform the check over X consecutive frames to filter out tracking noise
+            int northVotes = 0;
+            int southVotes = 0;
+
+            for(int i = 0; i < 5; ++i) {
+                if(watcher->wasNordActive()) northVotes++;
+                else southVotes++;
+            }
+
+            // Decide the active player based on the majority of votes
+            int myIdx = (northVotes >= southVotes) ? 0 : 1;
+            
             int otherIdx = 1 - myIdx; 
             Card card{recognizedCard.first, recognizedCard.second};
 
