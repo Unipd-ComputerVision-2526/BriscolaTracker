@@ -23,7 +23,6 @@ class Eye
         bool wasNordActive() {return plN_;};
         // Fills card with the last recognized card if present, else returns false
         bool getLastCard(std::pair<Suit, int>& card);
-        void setBaseline(const cv::Mat& img);
         
     private:
         // Feature extractors
@@ -55,9 +54,7 @@ class Eye
         
         void preprocessImage(const cv::Mat& img, cv::Mat& dst);
         void processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst);
-        void accumulateMotion(const cv::Mat& img, bool reset);
-        void computeCoinRatios();
-        void loadTemplates();
+        void accumulateMotion(const cv::Mat& img, bool flush);
         
         bool findCardPosition(const cv::Mat& img, cv::Mat& mask_out);
         bool findCardValue(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
@@ -67,8 +64,6 @@ class Eye
         bool akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
 
         int circleCounter(const cv::Mat& img, const cv::Mat& mask);
-        double calculateAspectRatios(const std::vector<cv::Rect>& rects);
-        std::vector<cv::Rect> getCoinRects(const cv::Mat& img, const cv::Mat& mask);
 
 };
 

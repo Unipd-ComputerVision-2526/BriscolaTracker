@@ -10,7 +10,7 @@ void TemplateCoinMatcher::addTemplates(const cv::Mat& templLarge, const cv::Mat&
         return;
     }
     templLarge_=templLarge.clone();
-    templMedium_=templMedium_.clone();
+    templMedium_=templMedium.clone();
 }
 
 void TemplateCoinMatcher::computeRatio(const cv::Mat& coin4, const cv::Mat& coin6)
@@ -20,7 +20,7 @@ void TemplateCoinMatcher::computeRatio(const cv::Mat& coin4, const cv::Mat& coin
     if(rects4.size() == 4) {
         expectedRatio4_ = calculateAspectRatios(rects4);
         std::cout << ">>> Ratio dinamico calcolato per il 4 di Denari: " << expectedRatio4_ << std::endl;
-    }//AND ELSE??????????????????????
+    }
 
     cv::Mat dummyMask6 = cv::Mat::ones(coin6.size(), CV_8UC1) * 255;
     std::vector<cv::Rect> rects6 = getCoinRects(coin6, dummyMask6);
@@ -75,6 +75,32 @@ double TemplateCoinMatcher::calculateAspectRatios(const std::vector<cv::Rect>& r
     return edgeLong / edgeShort;
 }
 
+int TemplateCoinMatcher::circleCounter(const cv::Mat& img, const cv::Mat& mask)
+{
+    int hough_circle_dp=1;
+    int hough_circle_min_dist=30;
+    int hough_slider_circle_1=100;
+    int hough_slider_circle_2=30;
+    int minRadius= 15;
+    int maxRadius= 30;
+
+    cv::Mat edges, gray, gray_cp;
+    std::vector<cv::Vec3f> circles;
+    cv::cvtColor(img,gray,cv::COLOR_Lab2BGR);
+    cv::cvtColor(gray,gray,cv::COLOR_BGR2GRAY);
+
+    gray.copyTo(gray_cp,mask);
+    cv::Canny(gray_cp, edges, 50, 200);
+    cv::HoughCircles(edges, circles, cv::HOUGH_GRADIENT, hough_circle_dp, hough_circle_min_dist, hough_slider_circle_1, hough_slider_circle_2, minRadius, maxRadius);
+
+    for(size_t i=0;i<circles.size();i++)
+    {
+        cv::circle(gray_cp,cv::Point(cvRound(circles[i][0]),cvRound(circles[i][1])),cvRound(circles[i][2]),cv::Scalar(0,255,0),1);
+    }
+
+    return circles.size();
+}
+
 bool TemplateCoinMatcher::match(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card)
 {
     std::vector<cv::Rect> coinRects;
@@ -95,7 +121,7 @@ bool TemplateCoinMatcher::match(const cv::Mat& img, const cv::Mat& mask, std::pa
         if (coin != 6 || coinRects.size() != 4) {
             std::cout<<"CARTA TROVATA TRAMITE FALLBACK TEMPLATE: " << coin << " DI DENARI"<<std::endl;
         }
-        std::cout<<"recognized by coin"<<std::endl;
+        std::cout<<"recognized by coin "<<card.second<<" "<<card.first<<std::endl;
         return true;
     }
     return false;

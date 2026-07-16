@@ -12,6 +12,7 @@ class TemplateCoinMatcher
         void computeRatio(const cv::Mat& coin4, const cv::Mat& coin6);
 
         bool match(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
+        int circleCounter(const cv::Mat& img, const cv::Mat& mask);
 
         double calculateAspectRatios(const std::vector<cv::Rect>& rects);
         std::vector<cv::Rect> getCoinRects(const cv::Mat& img, const cv::Mat& mask);

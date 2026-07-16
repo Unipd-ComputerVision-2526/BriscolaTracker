@@ -2,26 +2,33 @@
 #include <iostream>
 
 VideoFrameManager::VideoFrameManager(const std::string& videoPath)
-    : cap(videoPath), skip(10), threshold(5.0), fixedMode(false) {
-    if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
-    }
-}
-
-VideoFrameManager::VideoFrameManager(const std::string& videoPath, int frameSkip, double motionThreshold) 
-    : cap(videoPath), skip(frameSkip), threshold(motionThreshold), fixedMode(false) {
-    if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
-    }
-}
-
-VideoFrameManager::VideoFrameManager(const std::string& videoPath, int totalFramesToExtract)
-    : cap(videoPath), fixedMode(true), targetCount(totalFramesToExtract), extractedCount(0) {
-    
+    : skip(10), threshold(5.0), fixedMode(false) {
+    cap.open(videoPath, cv::CAP_FFMPEG);
     if (!cap.isOpened()) {
         std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
         return;
     }
+    cap.set(cv::CAP_PROP_ORIENTATION_AUTO, 1);
+}
+
+VideoFrameManager::VideoFrameManager(const std::string& videoPath, int frameSkip, double motionThreshold) 
+    : skip(frameSkip), threshold(motionThreshold), fixedMode(false) {
+    cap.open(videoPath, cv::CAP_FFMPEG);
+    if (!cap.isOpened()) {
+        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        return;
+    }
+    cap.set(cv::CAP_PROP_ORIENTATION_AUTO, 1);
+}
+
+VideoFrameManager::VideoFrameManager(const std::string& videoPath, int totalFramesToExtract)
+    : fixedMode(true), targetCount(totalFramesToExtract), extractedCount(0) {
+    cap.open(videoPath, cv::CAP_FFMPEG);
+    if (!cap.isOpened()) {
+        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        return;
+    }
+    cap.set(cv::CAP_PROP_ORIENTATION_AUTO, 1);
 
     double totalFrames = cap.get(cv::CAP_PROP_FRAME_COUNT);
     if (totalFrames > 0 && totalFramesToExtract > 0) {
@@ -64,6 +71,16 @@ bool VideoFrameManager::getNextInterestingFrame(cv::Mat& frame) {
         cap.set(cv::CAP_PROP_POS_FRAMES, targetPos);
 
         if (cap.read(frame)) {
+            double rotation = cap.get(cv::CAP_PROP_ORIENTATION_META) - 90.0;
+
+            if (rotation == 90.0) {
+                cv::rotate(frame, frame, cv::ROTATE_90_CLOCKWISE);
+            } else if (rotation == 180.0) {
+                cv::rotate(frame, frame, cv::ROTATE_180);
+            } else if (rotation == 270.0) {
+                cv::rotate(frame, frame, cv::ROTATE_180);
+            }
+
             extractedCount++;
             return true;
         }
@@ -73,6 +90,16 @@ bool VideoFrameManager::getNextInterestingFrame(cv::Mat& frame) {
     cv::Mat currentFrame;
     while (cap.read(currentFrame)) {
         cv::Mat graySmall;
+        double rotation = cap.get(cv::CAP_PROP_ORIENTATION_META) - 90.0;
+
+        if (rotation == 90.0) {
+            cv::rotate(currentFrame, currentFrame, cv::ROTATE_90_CLOCKWISE);
+        } else if (rotation == 180.0) {
+            cv::rotate(currentFrame, currentFrame, cv::ROTATE_180);
+        } else if (rotation == 270.0) {
+            cv::rotate(currentFrame, currentFrame, cv::ROTATE_90_COUNTERCLOCKWISE);
+        }
+
         cv::cvtColor(currentFrame, graySmall, cv::COLOR_BGR2GRAY);
         cv::resize(graySmall, graySmall, cv::Size(128, 128));
 
