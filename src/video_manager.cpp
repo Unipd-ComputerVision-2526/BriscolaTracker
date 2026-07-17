@@ -1,3 +1,9 @@
+/**
+ * @file video_manager.cpp
+ * @author Giovanni Stefanuto
+ */
+
+
 #include "video_manager.h"
 #include <iostream>
 
@@ -5,7 +11,7 @@ VideoFrameManager::VideoFrameManager(const std::string& videoPath)
     : skip(10), threshold(5.0), fixedMode(false) {
     cap.open(videoPath, cv::CAP_FFMPEG);
     if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        std::cerr << "Error: Unable to open video stream at: " << videoPath << std::endl;
         return;
     }
     cap.set(cv::CAP_PROP_ORIENTATION_AUTO, 1);
@@ -15,7 +21,7 @@ VideoFrameManager::VideoFrameManager(const std::string& videoPath, int frameSkip
     : skip(frameSkip), threshold(motionThreshold), fixedMode(false) {
     cap.open(videoPath, cv::CAP_FFMPEG);
     if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        std::cerr << "Error: Unable to open video stream at: " << videoPath << std::endl;
         return;
     }
     cap.set(cv::CAP_PROP_ORIENTATION_AUTO, 1);
@@ -25,7 +31,7 @@ VideoFrameManager::VideoFrameManager(const std::string& videoPath, int totalFram
     : fixedMode(true), targetCount(totalFramesToExtract), extractedCount(0) {
     cap.open(videoPath, cv::CAP_FFMPEG);
     if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        std::cerr << "Error: Unable to open video stream at: " << videoPath << std::endl;
         return;
     }
     cap.set(cv::CAP_PROP_ORIENTATION_AUTO, 1);

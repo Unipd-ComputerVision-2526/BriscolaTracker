@@ -1,3 +1,8 @@
+/**
+ * @file templateCoinMatcher.cpp
+ * @author Giovanni Stefanuto
+ */
+
 #include "templateCoinMatcher.h"
 #include "utils.h"
 #include <opencv2/imgproc.hpp>
@@ -19,20 +24,20 @@ void TemplateCoinMatcher::computeRatio(const cv::Mat& coin4, const cv::Mat& coin
     std::vector<cv::Rect> rects4 = getCoinRects(coin4, dummyMask4);
     if(rects4.size() == 4) {
         expectedRatio4_ = calculateAspectRatios(rects4);
-        std::cout << ">>> Ratio dinamico calcolato per il 4 di Denari: " << expectedRatio4_ << std::endl;
+        std::cout << ">>> Dynamic ratio calculated for 4 of Coins: " << expectedRatio4_ << std::endl;
     }
 
     cv::Mat dummyMask6 = cv::Mat::ones(coin6.size(), CV_8UC1) * 255;
     std::vector<cv::Rect> rects6 = getCoinRects(coin6, dummyMask6);
     if(rects6.size() == 6) {
-        // Ordina i rects dal più in alto al più in basso (y minore = più in alto)
+        // Sort rects from top to bottom (lower y = higher)
         std::sort(rects6.begin(), rects6.end(), [](const cv::Rect& a, const cv::Rect& b){
             return a.y < b.y;
         });
-        // Simuliamo il taglio: prendiamo solo i primi 4
+        // Simulate the cut: take only the first 4
         std::vector<cv::Rect> top4Rects(rects6.begin(), rects6.begin() + 4);
         expectedRatio6_ = calculateAspectRatios(top4Rects);
-        std::cout << ">>> Ratio dinamico calcolato per il 6 di Denari (tagliato): " << expectedRatio6_ << std::endl;
+        std::cout << ">>> Dynamic ratio calculated for 6 of Coins (cut): " << expectedRatio6_ << std::endl;
     }
 }
 
@@ -112,14 +117,14 @@ bool TemplateCoinMatcher::match(const cv::Mat& img, const cv::Mat& mask, std::pa
         double r = calculateAspectRatios(coinRects);
         if (std::abs(r - expectedRatio6_) < std::abs(r - expectedRatio4_)) {
             coin = 6;
-            std::cout<<"CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 6 DI DENARI (ricostruita dal ratio "<< r <<")"<<std::endl;
+            std::cout<<"CARD FOUND VIA TEMPLATE FALLBACK: 6 OF COINS (reconstructed from ratio "<< r <<")"<<std::endl;
         }
     }
     
     if (coin >= 2 && coin <= 7) {
         card = {Suit::COINS, coin};
         if (coin != 6 || coinRects.size() != 4) {
-            std::cout<<"CARTA TROVATA TRAMITE FALLBACK TEMPLATE: " << coin << " DI DENARI"<<std::endl;
+            std::cout<<"CARD FOUND VIA TEMPLATE FALLBACK: " << coin << " OF COINS"<<std::endl;
         }
         std::cout<<"recognized by coin "<<card.second<<" "<<card.first<<std::endl;
         return true;
@@ -130,11 +135,11 @@ bool TemplateCoinMatcher::match(const cv::Mat& img, const cv::Mat& mask, std::pa
 std::vector<cv::Rect> TemplateCoinMatcher::getCoinRects(const cv::Mat& img, const cv::Mat& mask) {
     if (templLarge_.empty() || templMedium_.empty()) return {};
 
-    // Troviamo il bounding box della maschera per ottimizzare la ricerca
+    // Find the bounding box of the mask to optimize the search
     cv::Rect roi = cv::boundingRect(mask);
     if (roi.area() == 0) return {};
     
-    // Per sicurezza, allarghiamo leggermente la ROI
+    // Expand the ROI slightly for safety
     roi.x = std::max(0, roi.x - 20);
     roi.y = std::max(0, roi.y - 20);
     roi.width = std::min(img.cols - roi.x, roi.width + 40);
@@ -143,8 +148,8 @@ std::vector<cv::Rect> TemplateCoinMatcher::getCoinRects(const cv::Mat& img, cons
     cv::Mat imgROI = img(roi);
     cv::Mat maskROI = mask(roi);
 
-    // Erodiamo la maschera per eliminare le ombre sottili e frammentate
-    // sulla Briscola statica. La vera carta in movimento è un blob solido.
+    // Erode the mask to eliminate thin, fragmented shadows
+    // on the static Briscola. The actual moving card is a solid blob.
     cv::Mat solidMask;
     cv::erode(maskROI, solidMask, cv::getStructuringElement(cv::MORPH_ELLIPSE, cv::Size(21, 21)));
 
@@ -179,7 +184,7 @@ std::vector<cv::Rect> TemplateCoinMatcher::getCoinRects(const cv::Mat& img, cons
                 cv::minMaxLoc(resultThresh, nullptr, &maxVal, nullptr, &maxLoc);
                 if (maxVal < thresholdScore) break;
 
-                // Controllo: il centro del template cade nella zona *solida* della maschera di movimento?
+                // Check: does the center of the template fall in the *solid* area of the motion mask?
                 cv::Point center(maxLoc.x + resizedTempl.cols/2, maxLoc.y + resizedTempl.rows/2);
                 if (solidMask.at<uchar>(center.y, center.x) > 128) {
                     all_detections.push_back({cv::Rect(roi.x + maxLoc.x, roi.y + maxLoc.y, resizedTempl.cols, resizedTempl.rows), maxVal});

@@ -1,3 +1,10 @@
+/**
+ * @file reporter.h
+ * @brief Header file for the Reporter class, which handles logging, exporting, and evaluating Briscola game rounds.
+ * @author Giovanni Stefanuto
+ */
+
+
 #ifndef REPORTER_H
 #define REPORTER_H
 
@@ -129,10 +136,8 @@ public:
     /**
      * @brief Generates a human-readable final report file.
      * @param filename Output report path.
-     * @param totalNorth Total score for North.
-     * @param totalSouth Total score for South.
      */
-    void generateFinalReport(const std::string& filename, int totalNorth, int totalSouth) const;
+    void generateFinalReport(const std::string& filename) const;
 
     /**
      * @brief Computes metrics by comparing recorded rounds against ground truth.
@@ -141,6 +146,32 @@ public:
      * @return Computed aggregate metrics.
      */
     GameMetrics calculateMetrics(const std::string& groundTruthPath, bool showDetailedStats = false) const;
+
+    // --- CONSOLE OUTPUT METHODS ---
+    
+    /** @brief Prints the game start message to console. */
+    void printGameStart(const std::string& gameName) const;
+
+    /** @brief Prints the final game results message to console. */
+    void printGameEnd(const std::string& gameName) const;
+
+    /** @brief Prints the successfully identified Briscola to console. */
+    void printBriscolaIdentified(int number, Suit suit, int maxFreq) const;
+
+    /** @brief Prints the round start message to console. */
+    void printRoundStart(int roundNumber) const;
+
+    /** @brief Prints a recognized card for a player. */
+    void printCardRecognized(const std::string& playerName, int number, Suit suit) const;
+
+    /** @brief Prints the round summary (leader, winner, points) to console. */
+    void printRoundFinished(int roundNumber, const std::string& leader, const std::string& winner, int points) const;
+
+    /** @brief Prints a general error or warning message to std::cerr. */
+    void printError(const std::string& message) const;
+    
+    // ------------------------------
+
 
 private:
     /** @brief Internal storage of all recorded rounds. */

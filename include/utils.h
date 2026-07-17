@@ -1,3 +1,10 @@
+/**
+ * @file utils.h
+ * @brief Utility functions and data structures for the Briscola Tracker project.
+ * @author Giovanni Stefanuto
+ */
+
+
 #ifndef UTILS_H
 #define UTILS_H
 
