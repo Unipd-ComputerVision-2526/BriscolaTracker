@@ -8,46 +8,63 @@
 #include <tuple>
 #include <string>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 #include <opencv2/opencv.hpp>
 #include "utils.h"
 #include "eye.h"
 #include "gameManager.h"
 
+/**
+ * @brief Calculates the percentage of correct identifications vs total attempts.
+ */
+double calcPct(int correct, int total);
+
+/**
+ * @brief Formats a count and its percentage for consistent UI output.
+ */
+std::string formatStat(int count, int total);
+
+/**
+ * @brief Displays command-line usage instructions.
+ */
+void printHelp();
+
+/**
+ * @brief Prints application version and project credits.
+ */
+void printVersion();
+
+/**
+ * @brief Aggregates and prints the final performance metrics for all processed games.
+ */
+void printGlobalResults(const GameMetrics& totalMetrics, bool showDetailedStats);
+
+// ============================================================================
+// MAIN EXECUTION
+// ============================================================================
+
 int main(int argc, char* argv[]) {
     bool showDetailedStats = false;
     bool verbose = false;
+
     for (int i = 1; i < argc; ++i) {
-        if (std::string(argv[i]) == "-stat") {
+        std::string arg = argv[i];
+        if (arg == "-stat") {
             showDetailedStats = true;
-        } else if (std::string(argv[i]) == "-verbose") {
+        } else if (arg == "-verbose") {
             verbose = true;
-        } else if (std::string(argv[i]) == "-help") {
-            std::cout << "Utilizzo: ./BriscolaTraker [OPZIONI]" << std::endl;
-            std::cout << "Opzioni:" << std::endl;
-            std::cout << "  -stat       Stampa la tabella dettagliata delle metriche dei semi." << std::endl;
-            std::cout << "  -verbose    Mostra log aggiuntivi e dettagli durante l'elaborazione." << std::endl;
-            std::cout << "  -version    Stampa la versione e il logo del progetto." << std::endl;
-            std::cout << "  -help       Mostra questo messaggio di aiuto." << std::endl;
+        } else if (arg == "-help") {
+            printHelp();
             return 0;
-        } else if (std::string(argv[i]) == "-version") {
-            std::cout << R"(
-  ____       _               _      _______             _             
- |  _ \     (_)             | |    |__   __|           | |            
- | |_) |_ __ _ ___  ___ ___ | | __ _  | |_ __ __ _  ___| | _____ _ __ 
- |  _ <| '__| / __|/ __/ _ \| |/ _` | | | '__/ _` |/ __| |/ / _ \ '__|
- | |_) | |  | \__ \ (_| (_) | | (_| | | | | | (_| | (__|   <  __/ |   
- |____/|_|  |_|___/\___\___/|_|\__,_| |_|_|  \__,_|\___|_|\_\___|_|   
-                                                                      
-)" << '\n';
-            std::cout << "BriscolaTracker v1.0" << std::endl;
-            std::cout << "Progetto di Computer Vision - Universita' degli Studi di Padova" << std::endl;
-            std::cout << "Riconoscimento automatico delle carte e del punteggio in una partita di Briscola." << std::endl;
+        } else if (arg == "-version") {
+            printVersion();
             return 0;
         }
     }
 
-    std::string datasetPath = "../dataset/Briscola_Trentine";
-    std::string baseFolderPath = "../dataset/";
+    const std::string datasetPath = "../dataset/Briscola_Trentine";
+    const std::string baseFolderPath = "../dataset/";
 
     std::vector<std::tuple<cv::Mat, Suit, int>> dataset = loadDataset(datasetPath);
     if (dataset.empty()) {
@@ -56,9 +73,9 @@ int main(int argc, char* argv[]) {
     }
 
     if (verbose) {
-        std::cout << "[VERBOSE] Dataset caricato: " << dataset.size() << " carte totali per il template matching." << std::endl;
+        std::cout << "[VERBOSE] Dataset loaded: " << dataset.size() << " total cards for template matching." << std::endl;
     } else {
-        std::cout << "Dataset caricato: " << dataset.size() << " carte." << std::endl;
+        std::cout << "Dataset loaded: " << dataset.size() << " cards." << std::endl;
     }
 
     Eye watcher;
@@ -67,7 +84,8 @@ int main(int argc, char* argv[]) {
     GameMetrics totalMetrics;
     GameManager manager(&watcher);
 
-    for (int g = 1; g <= 4; ++g) {
+    int g = 1;
+    while (true) {
         std::string gameName = "game" + std::to_string(g);
         std::string expectedPath = baseFolderPath + gameName;
 
@@ -77,49 +95,95 @@ int main(int argc, char* argv[]) {
 
         GameMetrics gm = manager.processFullGame(gameName, baseFolderPath, showDetailedStats);
         totalMetrics.add(gm);
+        
+        g++; 
     }
+    
+    printGlobalResults(totalMetrics, showDetailedStats);
+    
+    std::cout << "\n>>> ALL THE GAMES HAVE BEEN PROCESSED SUCCESSFULLY!" << std::endl;
 
-    auto formatPct = [](int count, int total) {
-        if (total == 0) return std::string("-");
-        double pct = (static_cast<double>(count) / total) * 100.0;
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%d (%.1f%%)", count, pct);
-        return std::string(buf);
-    };
+    return 0; 
+}
 
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+double calcPct(int correct, int total) {
+    if (total == 0) return 0.0;
+    return (static_cast<double>(correct) / total) * 100.0;
+}
+
+std::string formatStat(int count, int total) {
+    if (total == 0) return "-";
+    
+    std::stringstream ss;
+    ss << count << " (" << std::fixed << std::setprecision(1) << calcPct(count, total) << "%)";
+    return ss.str();
+}
+
+void printHelp() {
+    std::cout << "Usage: ./BriscolaTracker [OPTIONS]\n";
+    std::cout << "Options:\n";
+    std::cout << "  -stat       Prints the detailed table of suit metrics.\n";
+    std::cout << "  -verbose    Shows additional logs and details during processing.\n";
+    std::cout << "  -version    Prints the version and the project logo.\n";
+    std::cout << "  -help       Shows this help message.\n";
+}
+
+void printVersion() {
+    std::cout << R"(
+  ____       _               _      _______             _             
+ |  _ \     (_)             | |    |__   __|           | |            
+ | |_) |_ __ _ ___  ___ ___ | | __ _  | |_ __ __ _  ___| | _____ _ __ 
+ |  _ <| '__| / __|/ __/ _ \| |/ _` | | | '__/ _` |/ __| |/ / _ \ '__|
+ | |_) | |  | \__ \ (_| (_) | | (_| | | | | | (_| | (__|   <  __/ |   
+ |____/|_|  |_|___/\___\___/|_|\__,_| |_|_|  \__,_|\___|_|\_\___|_|   
+                                                                      
+)" << '\n';
+    std::cout << "BriscolaTracker v1.0\n";
+    std::cout << "Computer Vision Project - University of Padua\n";
+    std::cout << "Automatic card and score recognition in a game of Briscola.\n";
+}
+
+void printGlobalResults(const GameMetrics& totalMetrics, bool showDetailedStats) {
     std::cout << "\n========================================" << std::endl;
-    std::cout << " RISULTATI GLOBALI (TUTTI I GAME)" << std::endl;
+    std::cout << " GLOBAL RESULTS (ALL GAMES)" << std::endl;
     std::cout << "========================================" << std::endl;
-    std::cout << "Card Recognition Accuracy: " << (totalMetrics.expectedCards > 0 ? (static_cast<double>(totalMetrics.correctCards) / totalMetrics.expectedCards) * 100.0 : 0.0) << "%" << std::endl;
-    std::cout << "Player Identification Accuracy: " << (totalMetrics.totalPlayers > 0 ? (static_cast<double>(totalMetrics.correctPlayers) / totalMetrics.totalPlayers) * 100.0 : 0.0) << "%" << std::endl;
-    std::cout << "Briscola Recognition Accuracy: " << (totalMetrics.expectedBriscola > 0 ? (static_cast<double>(totalMetrics.correctBriscola) / totalMetrics.expectedBriscola) * 100.0 : 0.0) << "%" << std::endl;
-    std::cout << "Game Result Accuracy: " << (totalMetrics.expectedResultFields > 0 ? (static_cast<double>(totalMetrics.correctResultFields) / totalMetrics.expectedResultFields) * 100.0 : 0.0) << "%" << std::endl;
-    std::cout << "Rounds Evaluated: " << totalMetrics.totalEvaluated << " / " << (totalMetrics.expectedCards / 2) << std::endl;
+    std::cout << "Card Recognition Accuracy: "   << calcPct(totalMetrics.correctCards, totalMetrics.expectedCards) << "%\n";
+    std::cout << "Player Identification Accuracy: " << calcPct(totalMetrics.correctPlayers, totalMetrics.totalPlayers) << "%\n";
+    std::cout << "Briscola Recognition Accuracy: " << calcPct(totalMetrics.correctBriscola, totalMetrics.expectedBriscola) << "%\n";
+    std::cout << "Game Result Accuracy: "        << calcPct(totalMetrics.correctResultFields, totalMetrics.expectedResultFields) << "%\n";
+    
+    int expectedRounds = totalMetrics.expectedCards / 2;
+    std::cout << "Rounds Evaluated: " << totalMetrics.totalEvaluated << " / " << expectedRounds << "\n";
 
     if (showDetailedStats) {
         std::cout << "\n--- DETAILED SUIT METRICS (GLOBAL) ---\n";
-        std::cout << std::left << std::setw(10) << "SUIT" 
-                  << std::setw(15) << "totale atteso"
-                  << std::setw(20) << "Seme corretto"
-                  << std::setw(25) << "Seme + Numero esatti"
-                  << std::setw(20) << "Seme errato"
-                  << std::setw(20) << "Round incompleto"
-                  << std::endl;
+        
+        std::cout << std::left 
+                  << std::setw(10) << "SUIT" 
+                  << std::setw(15) << "Expected Total"
+                  << std::setw(20) << "Correct Suit"
+                  << std::setw(25) << "Exact Match (Suit+Num)"
+                  << std::setw(20) << "Wrong Suit"
+                  << std::setw(20) << "Incomplete Round"
+                  << "\n";
 
         std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
+        
         for (int i = 1; i <= 4; ++i) {
             const auto& sm = totalMetrics.suits[i];
-            std::cout << std::left << std::setw(10) << suitNames[i]
+            
+            std::cout << std::left 
+                      << std::setw(10) << suitNames[i]
                       << std::setw(15) << sm.expected
-                      << std::setw(20) << formatPct(sm.correctSuit, sm.expected)
-                      << std::setw(25) << formatPct(sm.exactMatch, sm.expected)
-                      << std::setw(20) << formatPct(sm.wrongSuit, sm.expected)
-                      << std::setw(20) << formatPct(sm.incompleteRound, sm.expected)
-                      << std::endl;
+                      << std::setw(20) << formatStat(sm.correctSuit, sm.expected)
+                      << std::setw(25) << formatStat(sm.exactMatch, sm.expected)
+                      << std::setw(20) << formatStat(sm.wrongSuit, sm.expected)
+                      << std::setw(20) << formatStat(sm.incompleteRound, sm.expected)
+                      << "\n";
         }
     }
-
-    std::cout << "\n>>> ALL THE GAMES HAVE BEEN PROCESSED SUCCESSFULLY!" << std::endl;
-
-    return 0;
 }

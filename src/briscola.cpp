@@ -27,7 +27,7 @@ static int cardRank(int number) {
     }
 }
 
-// Returns the points of the card.
+// Returns the points value of the card according to standard Briscola rules.
 static int cardPoints(int number) {
     switch (number) {
         case 1:  return 11;
@@ -61,14 +61,17 @@ Briscola::Briscola(Suit suit, int players)
 // PUBLIC METHODS
 // ============================================================================
 RoundResult Briscola::playRound(const Card& northCard, const Card& southCard, Player leader) {
+    // Validate cards early: cardRank will throw an exception if a card number is invalid.
+    // The return value is intentionally ignored here.
     cardRank(northCard.number); 
     cardRank(southCard.number); 
 
     if (isRoundComplete())
         throw std::logic_error("Cannot play round: previous round was not consumed");
 
-    // We push the cards in play order according to the externally provided leader.
-    // This ensures currentRoundCards[0] is always the card played by the leader.
+    // Push the cards in play order according to the externally provided leader.
+    // This ensures currentRoundCards[0] is always the card played by the leader,
+    // which dictates the "lead suit" for the current trick.
     if (leader == Player::North) {
         currentRoundCards.push_back({northCard.suit, northCard.number});
         currentRoundCards.push_back({southCard.suit, southCard.number});
@@ -108,7 +111,7 @@ void Briscola::setScores(const std::vector<int>& newScores) {
 
 bool Briscola::isRoundComplete() const {
     int playedCards = static_cast<int>(currentRoundCards.size());
-    return (playedCards == players) ? true : false;
+    return playedCards == players;
 }
 
 int Briscola::computeRound() {
@@ -127,7 +130,7 @@ int Briscola::computeRound() {
     // Rule 3: if neither is briscola, the challenger can only win if it
     //         matches the lead suit and has a higher rank.
     int globalWinner = playOrder[0];
-    int winnerCardIdx = 0; // index into currentRoundCards of the current winning card
+    int winnerCardIdx = 0; // Index into currentRoundCards of the current winning card
 
     for (int i = 1; i < players; ++i) {
         const std::pair<Suit, int>& challenger = currentRoundCards[i];
