@@ -81,7 +81,7 @@ struct GameMetrics {
     /** @brief Briscola evaluation denominator. */
     int expectedBriscola = 1; 
     /** @brief Player accuracy denominator accumulator used during metric computation. */
-    int totalPlayers = 40;
+    int totalPlayers = 0;
     /** @brief Number of correct game result fields. */
     int correctResultFields = 0;
     /** @brief Total expected game result fields. */

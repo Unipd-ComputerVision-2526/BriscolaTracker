@@ -55,6 +55,8 @@ private:
     bool isBriscolaIdentified;            ///< True if the static briscola card has been successfully identified.
     Card currentBriscolaCard;             ///< Stores the identified briscola card (suit and rank).
     bool briscolaPickedUp = false;       ///< True once the static briscola card has been confirmed off the table; stays true for the rest of the game.
+    Player previousWinner;              ///< Stores the winner of the previous round, who by the rules must lead the next trick.
+    bool isFirstRound = true;           ///< Flag indicating if the current round is the first one, where the leader is determined solely by visual detection.
 
     /**
      * @brief Converts a player index to their corresponding name.
