@@ -22,7 +22,7 @@ Suit stringToSuit(const std::string& semeStr) {
     if (semeStr == "swords" || semeStr == "spades") return SWORDS;
     if (semeStr == "clubs") return CLUBS;
     
-    std::cerr << "Errore: Suit sconosciuto '" << semeStr << "'. Fallback a COINS." << std::endl;
+    std::cerr << "Error: Unknown suit '" << semeStr << "'. Falling back to COINS." << std::endl;
     return COINS;
 }
 
@@ -51,7 +51,7 @@ std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datas
     std::vector<std::tuple<cv::Mat, Suit, int>> dataset;
 
     if (!fs::exists(datasetPath)) {
-        std::cerr << "Errore: Cartella dataset non trovata: " << datasetPath << std::endl;
+        std::cerr << "Error: Dataset directory not found: " << datasetPath << std::endl;
         return dataset;
     }
 
@@ -74,7 +74,7 @@ std::vector<std::tuple<cv::Mat, Suit, int>> loadDataset(const std::string& datas
             if (!img.empty()) {
                 dataset.push_back(std::make_tuple(img, seme, numero));
             } else {
-                std::cerr << "Errore lettura immagine: " << filename << std::endl;
+                std::cerr << "Error: Unable to read image file: " << filename << std::endl;
             }
         }
     }

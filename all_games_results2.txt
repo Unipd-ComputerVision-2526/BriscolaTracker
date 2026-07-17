@@ -1,0 +1,75 @@
+Dataset caricato: 40 carte.
+
+========================================
+ ANALISI game1
+========================================
+
+--- Round 1 (Leader: North) ---
+CARTA TROVATA (SIFT)
+Briscola identificata: 1 di 4
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 8 di 3
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 6
+Riconosciuta carta 2: 10 di 2
+Round 1 FINITO. Vincitore: North (6 pts)
+
+--- Round 2 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 7 di 4
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 2: 7 di 4
+Round 2 FINITO. Vincitore: North (0 pts)
+
+--- Round 3 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 9 di 2
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 7
+Riconosciuta carta 2: 10 di 3
+Round 3 FINITO. Vincitore: North (7 pts)
+
+--- Round 4 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 10 di 2
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+ERRORE: Round 4 incompleto (1/2)
+
+--- Round 5 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 14
+Riconosciuta carta 1: 3 di 3
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 2 di 4
+Round 5 FINITO. Vincitore: North (14 pts)
+
+--- Round 6 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 1: 7 di 2
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 2 di 2
+Round 6 FINITO. Vincitore: North (0 pts)
+
+--- Round 7 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 11
+Riconosciuta carta 1: 1 di 1
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 4 di 4
+Round 7 FINITO. Vincitore: North (11 pts)
+
+--- Round 8 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 1: 5 di 2

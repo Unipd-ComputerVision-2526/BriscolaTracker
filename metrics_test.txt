@@ -1,0 +1,150 @@
+Dataset caricato: 40 carte.
+
+========================================
+ ANALISI game1
+========================================
+
+--- Round 1 (Leader: North) ---
+CARTA TROVATA (SIFT)
+Briscola identificata: 1 di 4
+CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 5 DI DENARI
+Riconosciuta carta 1: 5 di 1
+CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 5 DI DENARI
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 2: 5 di 1
+Round 1 FINITO. Vincitore: North (0 pts)
+
+--- Round 2 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 7 di 4
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 2: 7 di 4
+Round 2 FINITO. Vincitore: North (0 pts)
+
+--- Round 3 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 9 di 2
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 7
+Riconosciuta carta 2: 10 di 3
+Round 3 FINITO. Vincitore: North (7 pts)
+
+--- Round 4 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 10 di 2
+CARTA TROVATA (SIFT)
+CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 2 DI DENARI
+POINTS OF THIS ROUND: 4
+Riconosciuta carta 2: 2 di 1
+Round 4 FINITO. Vincitore: North (4 pts)
+
+--- Round 5 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 3 di 3
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 10
+Riconosciuta carta 2: 2 di 4
+Round 5 FINITO. Vincitore: South (10 pts)
+
+--- Round 6 (Leader: South) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 7 di 2
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 2: 2 di 2
+Round 6 FINITO. Vincitore: South (0 pts)
+
+--- Round 7 (Leader: South) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 1 di 1
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 11
+Riconosciuta carta 2: 4 di 4
+Round 7 FINITO. Vincitore: North (11 pts)
+
+--- Round 8 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 5 di 2
+CARTA TROVATA (SIFT)
+ERRORE: Round 8 incompleto (1/2)
+
+--- Round 9 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 1: 4 di 2
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 9 di 4
+Round 9 FINITO. Vincitore: North (0 pts)
+
+--- Round 10 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 3
+Riconosciuta carta 1: 6 di 4
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 8 di 4
+Round 10 FINITO. Vincitore: North (3 pts)
+
+--- Round 11 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 2 DI DENARI
+POINTS OF THIS ROUND: 2
+Riconosciuta carta 1: 2 di 1
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 8 di 1
+Round 11 FINITO. Vincitore: North (2 pts)
+
+--- Round 12 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 2
+Riconosciuta carta 1: 6 di 3
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 5 di 4
+Round 12 FINITO. Vincitore: North (2 pts)
+
+--- Round 13 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 3
+Riconosciuta carta 1: 9 di 1
+CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 6 DI DENARI
+Riconosciuta carta 2: 6 di 1
+Round 13 FINITO. Vincitore: North (3 pts)
+
+--- Round 14 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+POINTS OF THIS ROUND: 0
+Riconosciuta carta 1: 7 di 3
+CARTA TROVATA (SIFT)
+Riconosciuta carta 2: 5 di 3
+Round 14 FINITO. Vincitore: North (0 pts)
+
+--- Round 15 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA TRAMITE FALLBACK TEMPLATE: 3 DI DENARI
+POINTS OF THIS ROUND: 10
+Riconosciuta carta 1: 3 di 1
+CARTA TROVATA (SIFT)
+ERRORE: Round 15 incompleto (1/2)
+
+--- Round 16 (Leader: North) ---
+CARTA TROVATA (SIFT)
+CARTA TROVATA (SIFT)
+Riconosciuta carta 1: 6 di 2
+CARTA TROVATA (SIFT)
+ERRORE: Round 16 incompleto (1/2)
+
+--- Round 17 (Leader: North) ---
+CARTA TROVATA (SIFT)

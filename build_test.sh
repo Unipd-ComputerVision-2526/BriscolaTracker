@@ -1,0 +1,1 @@
+g++ -std=c++17 src/test_spatiocolor_kmeans.cpp src/video_manager.cpp -I./include -I/usr/include/opencv4 -lopencv_core -lopencv_imgproc -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs -o test_spatiocolor_kmeans

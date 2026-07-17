@@ -1,0 +1,463 @@
+diff --git a/include/reporter.h b/include/reporter.h
+index 8de837e..d0f17e5 100644
+--- a/include/reporter.h
++++ b/include/reporter.h
+@@ -1,3 +1,10 @@
++/**
++ * @file reporter.h
++ * @brief Header file for the Reporter class, which handles logging, exporting, and evaluating Briscola game rounds.
++ * @author Giovanni Stefanuto
++ */
++
++
+ #ifndef REPORTER_H
+ #define REPORTER_H
+ 
+diff --git a/include/utils.h b/include/utils.h
+index 93fdea8..07abfba 100644
+--- a/include/utils.h
++++ b/include/utils.h
+@@ -1,3 +1,10 @@
++/**
++ * @file utils.h
++ * @brief Utility functions and data structures for the Briscola Tracker project.
++ * @author Giovanni Stefanuto
++ */
++
++
+ #ifndef UTILS_H
+ #define UTILS_H
+ 
+diff --git a/include/video_manager.h b/include/video_manager.h
+index 03b3091..b2a8489 100644
+--- a/include/video_manager.h
++++ b/include/video_manager.h
+@@ -1,3 +1,10 @@
++/**
++ * @file video_manager.h
++ * @brief Header file for the VideoFrameManager class, which handles frame extraction from video streams.
++ * @author Giovanni Stefanuto
++ */
++
++
+ #ifndef VIDEO_MANAGER_H
+ #define VIDEO_MANAGER_H
+ 
+diff --git a/src/reporter.cpp b/src/reporter.cpp
+index d7d0c08..418fd57 100644
+--- a/src/reporter.cpp
++++ b/src/reporter.cpp
+@@ -1,3 +1,9 @@
++/**
++ * @file reporter.cpp
++ * @author Giovanni Stefanuto
++ */
++
++
+ #include "reporter.h"
+ #include <fstream>
+ #include <sstream>
+diff --git a/src/test_blur.cpp b/src/test_blur.cpp
+deleted file mode 100644
+index 86229b2..0000000
+--- a/src/test_blur.cpp
++++ /dev/null
+@@ -1,131 +0,0 @@
+-#include <opencv2/opencv.hpp>
+-#include <iostream>
+-#include <vector>
+-#include <algorithm>
+-#include <string>
+-#include <chrono>
+-#include <filesystem>
+-
+-namespace fs = std::filesystem;
+-
+-// Funzione per calcolare la varianza del Laplaciano (ottimizzata senza visualizzazione)
+-double getLaplacianVariance(const cv::Mat& frame) {
+-    cv::Mat gray, laplacian, mean, stddev;
+-    if (frame.channels() == 3) {
+-        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+-    } else {
+-        gray = frame;
+-    }
+-    cv::Laplacian(gray, laplacian, CV_64F);
+-    cv::meanStdDev(laplacian, mean, stddev);
+-    double stddev_val = stddev.at<double>(0, 0);
+-    return stddev_val * stddev_val;
+-}
+-
+-int main() {
+-    // Lista delle cartelle da analizzare sequentialmente
+-    std::vector<std::string> target_folders = {
+-        "dataset/game1", 
+-        "dataset/game2", 
+-        "dataset/game3", 
+-        "dataset/game4"
+-    };
+-
+-    // Timer globale per l'intero dataset
+-    auto total_start = std::chrono::high_resolution_clock::now();
+-    
+-    int total_videos_processed = 0;
+-    int total_frames_processed = 0;
+-
+-    std::cout << "==================================================" << std::endl;
+-    std::cout << "      AVVIO BENCHMARK ANALISI MOTION BLUR        " << std::endl;
+-    std::cout << "==================================================" << std::endl;
+-
+-    for (const auto& folder_path : target_folders) {
+-        if (!fs::exists(folder_path)) {
+-            std::cout << "\n[INFO] Cartella non trovata: " << folder_path << " -> Salto." << std::endl;
+-            continue;
+-        }
+-
+-        std::cout << "\nScansione della cartella: " << folder_path << std::endl;
+-
+-        // Iterazione automatica sui file della cartella
+-        for (const auto& entry : fs::directory_iterator(folder_path)) {
+-            // Controlla che sia un file regolare e che l'estensione sia .mp4
+-            if (entry.is_regular_file() && entry.path().extension() == ".mp4") {
+-                std::string videoPath = entry.path().string();
+-                std::cout << "--------------------------------------------------" << std::endl;
+-                std::cout << "Analisi file: " << entry.path().filename().string() << std::endl;
+-
+-                cv::VideoCapture cap(videoPath);
+-                if (!cap.isOpened()) {
+-                    std::cerr << "  [ERRORE] Impossibile aprire il file video." << std::endl;
+-                    continue;
+-                }
+-
+-                // Timer per il singolo video
+-                auto video_start = std::chrono::high_resolution_clock::now();
+-                
+-                std::vector<double> variances;
+-                cv::Mat frame;
+-
+-                // Estrazione feature (Fase critica di calcolo)
+-                while (cap.read(frame)) {
+-                    variances.push_back(getLaplacianVariance(frame));
+-                }
+-                cap.release();
+-
+-                auto video_end = std::chrono::high_resolution_clock::now();
+-                std::chrono::duration<double> video_duration = video_end - video_start;
+-
+-                if (variances.empty()) {
+-                    std::cout << "  [AVVISO] Nessun frame estratto da questo video." << std::endl;
+-                    continue;
+-                }
+-
+-                // Calcolo statistico sul "cosa rimane" usando la soglia 0.85
+-                std::vector<double> sorted_variances = variances;
+-                std::sort(sorted_variances.begin(), sorted_variances.end());
+-                
+-                // Indica il valore di varianza sotto cui si trova l'85% dei frame
+-                double threshold = sorted_variances[sorted_variances.size() * 0.85];
+-                
+-                int sharp_frames_count = 0;
+-                for (double v : variances) {
+-                    if (v >= threshold) {
+-                        sharp_frames_count++;
+-                    }
+-                }
+-
+-                // Output metriche del singolo video
+-                std::cout << "  -> Elab. completata in : " << video_duration.count() << " secondi" << std::endl;
+-                std::cout << "  -> Frame totali        : " << variances.size() << std::endl;
+-                std::cout << "  -> Velocita' parziale  : " << variances.size() / video_duration.count() << " FPS" << std::endl;
+-                std::cout << "  -> Valore Soglia (0.85): " << threshold << std::endl;
+-                std::cout << "  -> Frame Nitidi Rimasti: " << sharp_frames_count << " (top 15%)" << std::endl;
+-
+-                total_frames_processed += variances.size();
+-                total_videos_processed++;
+-            }
+-        }
+-    }
+-
+-    // Stop del timer globale
+-    auto total_end = std::chrono::high_resolution_clock::now();
+-    std::chrono::duration<double> total_duration = total_end - total_start;
+-
+-    // Report Finale dei Tempi
+-    std::cout << "\n==================================================" << std::endl;
+-    std::cout << "                REPORT FINALE                    " << std::endl;
+-    std::cout << "==================================================" << std::endl;
+-    std::cout << "Video totali analizzati : " << total_videos_processed << std::endl;
+-    std::cout << "Frame totali elaborati  : " << total_frames_processed << std::endl;
+-    std::cout << "TEMPO TOTALE IMPIEGATO  : " << total_duration.count() << " secondi" << std::endl;
+-    
+-    if (total_duration.count() > 0) {
+-        std::cout << "VELOCITA' MEDIA DATASET : " << total_frames_processed / total_duration.count() << " FPS" << std::endl;
+-    }
+-    std::cout << "==================================================" << std::endl;
+-
+-    return 0;
+-}
+\ No newline at end of file
+diff --git a/src/test_sift_tuning.cpp b/src/test_sift_tuning.cpp
+deleted file mode 100644
+index 7bb6cfe..0000000
+--- a/src/test_sift_tuning.cpp
++++ /dev/null
+@@ -1,67 +0,0 @@
+-#include <opencv2/opencv.hpp>
+-#include <iostream>
+-#include <vector>
+-#include <string>
+-
+-// Funzione di utilità per testare l'estrazione dei keypoints
+-void testFeatureExtraction(const std::string& imagePath) {
+-    cv::Mat img = cv::imread(imagePath);
+-    if (img.empty()) {
+-        std::cerr << "Errore: Impossibile caricare " << imagePath << std::endl;
+-        return;
+-    }
+-
+-    std::cout << "--- Analisi di: " << imagePath << " ---" << std::endl;
+-
+-    // 1. SIFT Standard (Default OpenCV)
+-    cv::Ptr<cv::SIFT> sift_standard = cv::SIFT::create();
+-    std::vector<cv::KeyPoint> kp_standard;
+-    cv::Mat desc_standard;
+-    sift_standard->detectAndCompute(img, cv::noArray(), kp_standard, desc_standard);
+-    std::cout << "1. SIFT Standard (Default): " << kp_standard.size() << " keypoints." << std::endl;
+-
+-    // 2. SIFT Tuned (Contrasto ridotto, edge aumentato)
+-    // contrastThreshold: da 0.04 a 0.02 (cattura feature più deboli)
+-    // edgeThreshold: da 10 a 15 (accetta forme più tondeggianti/bordi meno netti)
+-    cv::Ptr<cv::SIFT> sift_tuned = cv::SIFT::create(0, 3, 0.02, 15, 1.6);
+-    std::vector<cv::KeyPoint> kp_tuned;
+-    cv::Mat desc_tuned;
+-    sift_tuned->detectAndCompute(img, cv::noArray(), kp_tuned, desc_tuned);
+-    std::cout << "2. SIFT Tuned (Contrasto 0.02, Edge 15): " << kp_tuned.size() << " keypoints." << std::endl;
+-
+-    // 3. Preprocessing CLAHE + SIFT Standard
+-    cv::Mat lab_img;
+-    cv::cvtColor(img, lab_img, cv::COLOR_BGR2Lab);
+-    
+-    std::vector<cv::Mat> lab_channels;
+-    cv::split(lab_img, lab_channels);
+-    
+-    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
+-    clahe->setClipLimit(3.0);
+-    clahe->setTilesGridSize(cv::Size(8, 8));
+-    
+-    cv::Mat clahe_l_channel;
+-    clahe->apply(lab_channels[0], clahe_l_channel);
+-    
+-    clahe_l_channel.copyTo(lab_channels[0]);
+-    cv::Mat preprocessed_img;
+-    cv::merge(lab_channels, preprocessed_img);
+-    cv::cvtColor(preprocessed_img, preprocessed_img, cv::COLOR_Lab2BGR);
+-
+-    std::vector<cv::KeyPoint> kp_clahe;
+-    cv::Mat desc_clahe;
+-    sift_standard->detectAndCompute(preprocessed_img, cv::noArray(), kp_clahe, desc_clahe);
+-    std::cout << "3. Preprocessing CLAHE + SIFT Standard: " << kp_clahe.size() << " keypoints." << std::endl;
+-    std::cout << std::endl;
+-}
+-
+-int main() {
+-    // Testiamo un denari difficile (es. 5 di denari o 10 di denari)
+-    std::string testImage1 = "../dataset/Briscola_Trentine/5-coins.JPG";
+-    std::string testImage2 = "../dataset/Briscola_Trentine/10-coins.JPG";
+-    
+-    testFeatureExtraction(testImage1);
+-    testFeatureExtraction(testImage2);
+-
+-    return 0;
+-}
+diff --git a/src/test_template_matching.cpp b/src/test_template_matching.cpp
+deleted file mode 100644
+index de5d8d8..0000000
+--- a/src/test_template_matching.cpp
++++ /dev/null
+@@ -1,159 +0,0 @@
+-#include <opencv2/opencv.hpp>
+-#include <iostream>
+-#include <vector>
+-#include <string>
+-#include <chrono>
+-#include <map>
+-
+-using namespace cv;
+-using namespace std;
+-
+-struct Detection {
+-    Rect rect;
+-    double score;
+-    double scale;
+-    int templateIdx; 
+-};
+-
+-double getIoU(Rect r1, Rect r2) {
+-    int interArea = (r1 & r2).area();
+-    int unionArea = r1.area() + r2.area() - interArea;
+-    if (unionArea == 0) return 0;
+-    return (double)interArea / unionArea;
+-}
+-
+-int main(int argc, char** argv) {
+-    // 1. TEMPLATE GRANDE (dal 3 di denari)
+-    string templateSourcePathLarge = "dataset/Briscola_Trentine/3-coins.JPG";
+-    Mat templateSourceLarge = imread(templateSourcePathLarge);
+-    if (templateSourceLarge.empty()) {
+-        cerr << "Errore: impossibile caricare " << templateSourcePathLarge << endl;
+-        return -1;
+-    }
+-    Rect roiLarge(222, 84, 127, 131);
+-    Mat templLarge = templateSourceLarge(roiLarge).clone();
+-
+-    // 2. TEMPLATE MEDIO (dal 7 di denari)
+-    string templateSourcePath7 = "dataset/Briscola_Trentine/7-coins.JPG";
+-    Mat templateSource7 = imread(templateSourcePath7);
+-    if (templateSource7.empty()) {
+-        cerr << "Errore: impossibile caricare " << templateSourcePath7 << endl;
+-        return -1;
+-    }
+-    Rect roi7(406, 47, 94, 89);
+-    Mat templ7 = templateSource7(roi7).clone();
+-
+-    vector<Mat> templates = {templLarge, templ7};
+-    vector<string> templateNames = {"GRANDE(3)", "MEDIO(7)"};
+-
+-    // Ground truth FILTRATA (Solo frame SENZA FIGURE: 8, 9, 10 esclusi)
+-    map<string, int> ground_truth = {
+-        {"frame4.jpg", 5}, {"frame37.jpg", 2}, {"frame105.jpg", 4}, 
+-        {"frame144.jpg", 3}, {"frame197.jpg", 7}, {"frame206.jpg", 14}, 
+-        {"frame214.jpg", 5}, {"frame254.jpg", 2}, {"frame256.jpg", 5}, 
+-        {"frame317.jpg", 6}, {"frame335.jpg", 0}, {"frame387.jpg", 4}, 
+-        {"frame424.jpg", 5}, {"frame434.jpg", 6}, {"frame446.jpg", 2}, 
+-        {"frame466.jpg", 4}, {"frame493.jpg", 3}, {"frame525.jpg", 7}, 
+-        {"frame584.jpg", 0}, {"frame601.jpg", 4}, {"frame657.jpg", 8}, 
+-        {"frame705.jpg", 9}, {"frame707.jpg", 11}, {"frame756.jpg", 4}, 
+-        {"frame766.jpg", 11}, {"frame784.jpg", 4}, {"frame797.jpg", 3}
+-    };
+-
+-    double scaleStart = 0.3;
+-    double scaleEnd = 1.5; 
+-    double scaleStep = 0.1;
+-    double thresholdScore = 0.60; 
+-
+-    cout << "\n--- TEST DOPPIO TEMPLATE (Ottimizzato e Definitivo) ---" << endl;
+-    int total_frames = 0;
+-    int perfect_matches = 0;
+-
+-    for (const auto& pair : ground_truth) {
+-        string frameName = pair.first;
+-        int expected = pair.second;
+-        Mat frame = imread("extracted_samples/" + frameName);
+-        if (frame.empty()) continue;
+-
+-        total_frames++;
+-        auto start_time = chrono::high_resolution_clock::now();
+-        
+-        Rect searchROI(frame.cols * 0.1, frame.rows * 0.1, frame.cols * 0.8, frame.rows * 0.8);
+-        Mat frameROI = frame(searchROI);
+-        
+-        vector<Detection> all_detections;
+-
+-        for (int tIdx = 0; tIdx < templates.size(); tIdx++) {
+-            Mat t = templates[tIdx];
+-            for (double scale = scaleStart; scale <= scaleEnd; scale += scaleStep) {
+-                Mat resizedTempl;
+-                resize(t, resizedTempl, Size(), scale, scale);
+-
+-                if (resizedTempl.cols < 38 || resizedTempl.rows < 38 || (resizedTempl.cols * resizedTempl.rows) < 1500) {
+-                    continue;
+-                }
+-
+-                if (resizedTempl.cols > frameROI.cols || resizedTempl.rows > frameROI.rows) continue;
+-
+-                Mat result;
+-                matchTemplate(frameROI, resizedTempl, result, TM_CCOEFF_NORMED);
+-                Mat resultThresh;
+-                threshold(result, resultThresh, thresholdScore, 1.0, THRESH_TOZERO);
+-
+-                while (true) {
+-                    double maxVal; Point maxLoc;
+-                    minMaxLoc(resultThresh, nullptr, &maxVal, nullptr, &maxLoc);
+-                    if (maxVal < thresholdScore) break;
+-
+-                    int globalX = searchROI.x + maxLoc.x;
+-                    int globalY = searchROI.y + maxLoc.y;
+-                    all_detections.push_back({Rect(globalX, globalY, resizedTempl.cols, resizedTempl.rows), maxVal, scale, tIdx});
+-
+-                    int maskRadiusX = max(1, resizedTempl.cols / 2);
+-                    int maskRadiusY = max(1, resizedTempl.rows / 2);
+-                    Point pt1(max(0, maxLoc.x - maskRadiusX), max(0, maxLoc.y - maskRadiusY));
+-                    Point pt2(min(resultThresh.cols - 1, maxLoc.x + maskRadiusX), min(resultThresh.rows - 1, maxLoc.y + maskRadiusY));
+-                    rectangle(resultThresh, pt1, pt2, Scalar(0), FILLED);
+-                }
+-            }
+-        }
+-
+-        sort(all_detections.begin(), all_detections.end(), [](const Detection& a, const Detection& b) {
+-            return a.score > b.score;
+-        });
+-
+-        vector<Detection> final_detections;
+-        for (const auto& det : all_detections) {
+-            bool keep = true;
+-            for (const auto& final_det : final_detections) {
+-                if (getIoU(det.rect, final_det.rect) > 0.2) { 
+-                    keep = false;
+-                    break;
+-                }
+-            }
+-            if (keep) final_detections.push_back(det);
+-        }
+-
+-        auto end_time = chrono::high_resolution_clock::now();
+-        auto duration = chrono::duration_cast<chrono::milliseconds>(end_time - start_time).count();
+-
+-        int found = final_detections.size();
+-        if (found == expected) perfect_matches++;
+-
+-        string status = (found == expected) ? "[OK]" : "[ERRORE]";
+-        cout << status << " " << frameName << " -> Attesi: " << expected << ", Trovati: " << found << " (Tempo: " << duration << " ms)" << endl;
+-        
+-        if (found > 0) {
+-            for (const auto& det : final_detections) {
+-                cout << "     - " << templateNames[det.templateIdx] 
+-                     << " [Scala: " << det.scale 
+-                     << ", Score: " << det.score << "]" << endl;
+-            }
+-        }
+-        cout << endl;
+-    }
+-
+-    cout << "\n=== RISULTATI FINALI ===" << endl;
+-    cout << "Frame perfetti (SENZA FIGURE): " << perfect_matches << " su " << total_frames << endl;
+-
+-    return 0;
+-}
+diff --git a/src/utils.cpp b/src/utils.cpp
+index 1255dfc..eeddb62 100644
+--- a/src/utils.cpp
++++ b/src/utils.cpp
+@@ -1,3 +1,9 @@
++/**
++ * @file utils.cpp
++ * @author Giovanni Stefanuto
++ */
++
++
+ #include <utils.h>
+ #include <iostream>
+ #include <filesystem>
+diff --git a/src/video_manager.cpp b/src/video_manager.cpp
+index 6cc8a09..e4e892d 100644
+--- a/src/video_manager.cpp
++++ b/src/video_manager.cpp
+@@ -1,3 +1,9 @@
++/**
++ * @file video_manager.cpp
++ * @author Giovanni Stefanuto
++ */
++
++
+ #include "video_manager.h"
+ #include <iostream>
+ 

@@ -10,14 +10,14 @@
 VideoFrameManager::VideoFrameManager(const std::string& videoPath)
     : cap(videoPath), skip(10), threshold(5.0), fixedMode(false) {
     if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        std::cerr << "Error: Unable to open video stream at: " << videoPath << std::endl;
     }
 }
 
 VideoFrameManager::VideoFrameManager(const std::string& videoPath, int frameSkip, double motionThreshold) 
     : cap(videoPath), skip(frameSkip), threshold(motionThreshold), fixedMode(false) {
     if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        std::cerr << "Error: Unable to open video stream at: " << videoPath << std::endl;
     }
 }
 
@@ -25,7 +25,7 @@ VideoFrameManager::VideoFrameManager(const std::string& videoPath, int totalFram
     : cap(videoPath), fixedMode(true), targetCount(totalFramesToExtract), extractedCount(0) {
     
     if (!cap.isOpened()) {
-        std::cerr << "Errore: Impossibile aprire il video: " << videoPath << std::endl;
+        std::cerr << "Error: Unable to open video stream at: " << videoPath << std::endl;
         return;
     }
 
