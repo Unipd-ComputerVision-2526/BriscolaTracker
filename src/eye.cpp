@@ -28,7 +28,7 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
     std::vector<cv::KeyPoint> keypoints;
     std::vector<cv::Mat> channels, trainReadyDesc;
     cv::Mat img_cp, descriptors, si_all_descriptors, ak_all_descriptors, akaze_ready;
-    cv::Mat templMedium_,templLarge_;
+    cv::Mat templMedium_,templLarge_, coin4, coin6;
 
     for (const std::tuple<cv::Mat, Suit, int>& card : trainingset){
         if(!isValidImage(std::get<0>(card)))
@@ -69,7 +69,7 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
             switch(p.second)
             {
                 case 3:
-                    templLarge_ = img_cp(cv::Rect(222, 84, 127, 131)).clone();
+                    templLarge_ = img_cp.clone();
                     break;
                 case 4:
                     coin4=img_cp.clone();
@@ -78,11 +78,9 @@ void Eye::fit(const std::vector<std::tuple<cv::Mat, Suit, int>>& trainingset)
                     coin6=img_cp.clone();
                     break;
                 case 7:
-                    templMedium_ = img_cp(cv::Rect(406, 47, 94, 89)).clone();
+                    templMedium_ = img_cp.clone();
                     break;
             }
-            if(!templLarge_.empty() && !templMedium_.empty())
-                templatesLoaded_ = true;
         }
     }
     fl_matcher_.train();
@@ -113,7 +111,6 @@ bool Eye::recognize(const cv::Mat& image, std::pair<Suit, int>& card)
         card_=card;
         return true;
     }
-    getLastCard(card);
     return false;
 }
 
@@ -199,7 +196,6 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
     cv::Mat kernel_7    = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(7,7));
     cv::Mat kernel_11   = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(11,11));
 
-    //cv::GaussianBlur(img,hsv_img,cv::Size(3,3),0);
     cv::cvtColor(img, hsv_img, cv::COLOR_BGR2HSV);
     cv::split(hsv_img, channels);
 
@@ -210,25 +206,13 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
     cv::dilate(mask_high_sat,mask_high_sat,kernel_5);
     cv::erode(mask_high_sat,mask_high_sat,kernel_3);
 
-    /*cv::namedWindow("mask_high_sat",cv::WINDOW_NORMAL);
-    //cv::imshow("mask_high_sat",mask_high_sat);
-    cv::resizeWindow("mask_high_sat", cv::Size(400,700));*/
-
     cv::meanStdDev(channels[2],mean,stddev);
     z_score = (channels[2]-mean)/stddev;
     cv::threshold(z_score,mask_lights,0.985,255,cv::THRESH_BINARY);
     cv::erode(mask_lights, mask_lights, kernel_3);
-    
-    /*cv::namedWindow("mask_lights",cv::WINDOW_NORMAL);
-    //cv::imshow("mask_lights",mask_lights);
-    cv::resizeWindow("mask_lights", cv::Size(400,700));*/
 
     mask_lights = mask_lights+mask_high_sat;
     cv::morphologyEx(mask_lights, mask_lights, cv::MORPH_CLOSE, kernel_3);
-
-    /*cv::namedWindow("mask_sum",cv::WINDOW_NORMAL);
-    //cv::imshow("mask_sum",mask_lights);
-    cv::resizeWindow("mask_sum", cv::Size(400,700));*/
 
     cv::findContours(mask_lights,contours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
     mask_out = cv::Mat::zeros(mask_lights.size(), CV_8UC1);
@@ -238,13 +222,7 @@ bool Eye::findCardPosition(const cv::Mat& img, cv::Mat& mask_out){
         cv::drawContours(mask_out,contours, i, cv::Scalar(255), cv::FILLED);
     }
 
-    /*cv::namedWindow("mask_out",cv::WINDOW_NORMAL);
-    //cv::imshow("mask_out",mask_out);
-    cv::resizeWindow("mask_out", cv::Size(400,700));*/
-
     cv::morphologyEx(mask_out, mask_out, cv::MORPH_CLOSE, kernel_7);
-
-    //cv::waitKey(0);
 
     if(cv::countNonZero(mask_out) < (img.rows*img.cols)*0.01)
         return false;
@@ -283,18 +261,12 @@ bool Eye::recognizeCard(const cv::Mat& img, std::pair<Suit, int>& card, cv::Mat&
     preprocessImage(rescaled,rescaled);
     if(!findCardPosition(rescaled, mask))
     {
+        getLastCard(card);
         return false;
     }
 
     cv::resize(mask, mask, cv::Size(mask.cols*3, mask.rows*3));
     processMask(img, mask, diffMask);
-
-    /*cv::namedWindow("img",cv::WINDOW_NORMAL);
-    //cv::imshow("img",rescaled);
-    cv::resizeWindow("img", cv::Size(400,700));
-    cv::namedWindow("mask",cv::WINDOW_NORMAL);
-    //cv::imshow("mask",diffMask);
-    cv::resizeWindow("mask", cv::Size(400,700));*/
 
     if(!findCardValue(img, diffMask, card))
         return false;
@@ -394,8 +366,6 @@ bool Eye::siftRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int
     if(*maxCounts < 15)
         return false;
 
-    std::cout<<"recognized by sift "<<card.second<<" "<<card.first<<std::endl;
-
     return true;
 }
 
@@ -441,13 +411,10 @@ bool Eye::akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, in
     if(*maxCounts < 10)
         return false;
 
-    std::cout<<"recognized by akaze"<<std::endl;
-
     if(card.first==Suit::COINS){
-        int c=circleCounter(img, mask);
+        int c=tc_matcher_.circleCounter(img, mask);
         if(c<8 && (card.second<c || (card.second>7 && c>4))){
             card.second=c;
-            std::cout<<"recognized by akaze "<<card.second<<" "<<card.first<<std::endl;
             return true;
         }
         std::vector<int>::iterator secMaxCounts=std::find(maxCounts + 1, matchCount.end(), *maxCounts);
@@ -458,7 +425,6 @@ bool Eye::akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, in
                 card.second=cardVector_[imgIdx].second;
         }
     }
-
 
     return true;
 }

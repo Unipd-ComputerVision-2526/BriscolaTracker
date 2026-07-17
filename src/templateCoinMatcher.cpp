@@ -9,8 +9,8 @@ void TemplateCoinMatcher::addTemplates(const cv::Mat& templLarge, const cv::Mat&
     {
         return;
     }
-    templLarge_=templLarge.clone();
-    templMedium_=templMedium.clone();
+    templLarge_=templLarge(cv::Rect(222, 84, 127, 131)).clone();
+    templMedium_=templMedium(cv::Rect(406, 47, 94, 89)).clone();
 }
 
 void TemplateCoinMatcher::computeRatio(const cv::Mat& coin4, const cv::Mat& coin6)
