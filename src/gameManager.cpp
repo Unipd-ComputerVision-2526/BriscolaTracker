@@ -301,7 +301,32 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             
             // The first player to drop a valid card becomes the leader
             if (!leaderKnown) { 
-                leader = (myIdx == 0) ? Player::North : Player::South; 
+                Player visualLeader = static_cast<Player>(myIdx);
+
+                if (isFirstRound) {
+                    leader = visualLeader;
+                } else {
+                    if (visualLeader == previousWinner) {
+                        leader = visualLeader; 
+                    } else {
+                        std::cout << ">>> WARNING: Leader mismatch! Video: " 
+                                  << playerIdxToName(static_cast<int>(visualLeader)) 
+                                  << " | Rules: " 
+                                  << playerIdxToName(static_cast<int>(previousWinner)) << std::endl;
+                        
+                        int voteDifference = std::abs(northVotes - southVotes);
+                        
+                        if (voteDifference < 3) {
+                            std::cout << "    -> Uncertain motion (diff: " << voteDifference 
+                                      << "). Using rules to avoid false positives." << std::endl;
+                            leader = previousWinner;
+                        } else {
+                            std::cout << "    -> Clear motion (diff: " << voteDifference 
+                                      << "). Using video to prevent error propagation." << std::endl;
+                            leader = visualLeader;
+                        }
+                    }
+                }
                 leaderKnown = true; 
             }
             
@@ -314,9 +339,13 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
     }
 
     if (found[0] && found[1]) {
+        //Both cards identified by the vision system.
         try {
             RoundResult result = gameEngine->playRound(playedCards[0], playedCards[1], leader);
             
+            previousWinner = result.winner; 
+            isFirstRound = false;
+
             // Calls the helper function to pack and send data to reporter
             recordRoundResults(roundNumber, playedCards, result);
 
@@ -325,10 +354,40 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
                       << " could not be resolved (" << e.what() << "). Skipping." << std::endl;
         }
     } else {
-        std::cout << "ERROR: Round " << roundNumber << " incomplete (North: "
-                  << (found[0] ? "found" : "missing") << ", South: "
-                  << (found[1] ? "found" : "missing") << ")" << std::endl;
-    }
+        std::cout << ">>> ERROR: Round " << roundNumber << " incomplete. Applying fallback." << std::endl;
+        
+        // Assign a non-trump suit to the placeholder to avoid unintended point manipulation
+        Suit dummySuit = (currentBriscolaCard.suit == Suit::COINS) ? Suit::CUPS : Suit::COINS;
+        
+        // Fill missing card slots with a low-value placeholder (2 = 0 points)
+        // to satisfy engine requirements without influencing valid point calculations
+        for (int i = 0; i < 2; ++i) {
+            if (!found[i]) {
+                playedCards[i] = Card{dummySuit, 2}; 
+            }
+        }
+        
+        try {
+            // Determine leader based on game history if visual leader detection failed
+            if (!leaderKnown) {
+                leader = (isFirstRound) ? Player::North : previousWinner;
+            }
+            
+            RoundResult result = gameEngine->playRound(playedCards[0], playedCards[1], leader);
+            
+            previousWinner = result.winner;
+            isFirstRound = false;
+            
+            //Reset unidentified card values to 0 before logging to maintain data integrity in the final report
+            for (int i = 0; i < 2; ++i) {
+                if (!found[i]) playedCards[i].number = 0; 
+            }
+            
+            recordRoundResults(roundNumber, playedCards, result);
+            
+        } catch (const std::exception& e) {
+             std::cerr << ">>> ERROR: Fallback failed: " << e.what() << std::endl;
+        }
 }
 
 void GameManager::recordRoundResults(int roundNumber, const Card playedCards[2], const RoundResult& result) {
@@ -354,4 +413,5 @@ void GameManager::recordRoundResults(int roundNumber, const Card playedCards[2],
               << ". Winner: " << data.winner << " (" << data.points << " pts)" << std::endl;
 }
  
+
 
