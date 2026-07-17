@@ -34,7 +34,7 @@ void Reporter::logRound(const RoundData& data) {
 template <typename T>
 bool Reporter::checkStream(const T& stream, const std::string& filename) const {
     if (!stream.is_open()) {
-        std::cerr << "Errore: Impossibile gestire il file: " << filename << std::endl;
+        std::cerr << "Error: Unable to open file stream for: " << filename << std::endl;
         return false;
     }
     return true;
@@ -199,11 +199,11 @@ void Reporter::printMetricsReport(const GameMetrics& metrics, bool showDetailedS
     if (showDetailedStats) {
         std::cout << "\n--- DETAILED SUIT METRICS ---\n";
         std::cout << std::left << std::setw(10) << "SUIT"
-                  << std::setw(15) << "totale atteso"
-                  << std::setw(20) << "Seme corretto"
-                  << std::setw(25) << "Seme + Numero esatti"
-                  << std::setw(20) << "Seme errato"
-                  << std::setw(20) << "Round incompleto"
+                  << std::setw(15) << "Total Expected"
+                  << std::setw(20) << "Correct Suit"
+                  << std::setw(25) << "Exact Match"
+                  << std::setw(20) << "Wrong Suit"
+                  << std::setw(20) << "Incomplete Round"
                   << std::endl;
 
         std::string suitNames[] = {"", "COINS", "CUPS", "SWORDS", "CLUBS"};
