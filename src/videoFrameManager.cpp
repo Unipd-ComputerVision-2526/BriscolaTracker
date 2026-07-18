@@ -4,7 +4,7 @@
  */
 
 
-#include "video_manager.h"
+#include "videoFrameManager.h"
 #include <iostream>
 
 VideoFrameManager::VideoFrameManager(const std::string& videoPath)

@@ -411,20 +411,5 @@ bool Eye::akazeRecognition(cv::Mat& img, const cv::Mat& mask, std::pair<Suit, in
     if(*maxCounts < 10)
         return false;
 
-    if(card.first==Suit::COINS){
-        int c=tc_matcher_.circleCounter(img, mask);
-        if(c<8 && (card.second<c || (card.second>7 && c>4))){
-            card.second=c;
-            return true;
-        }
-        std::vector<int>::iterator secMaxCounts=std::find(maxCounts + 1, matchCount.end(), *maxCounts);
-        if(*maxCounts == *secMaxCounts){
-            imgIdx = std::distance(matchCount.begin(),secMaxCounts);
-            std::cout<<cardVector_[imgIdx].first<<" "<<cardVector_[imgIdx].second<<std::endl;
-            if(cardVector_[imgIdx].first==card.first && cardVector_[imgIdx].second>card.second && cardVector_[imgIdx].second<8)
-                card.second=cardVector_[imgIdx].second;
-        }
-    }
-
     return true;
 }

@@ -59,6 +59,13 @@ Suit Reporter::stringToSuitInternal(const std::string& s) const {
 }
 
 void Reporter::exportCSV(const std::string& filename) const {
+    std::filesystem::path filepath(filename);
+    std::filesystem::path dir = filepath.parent_path();
+    
+    if (!dir.empty() && !std::filesystem::exists(dir)) {
+        std::filesystem::create_directories(dir);
+    }
+
     std::ofstream file(filename);
     if (!checkStream(file, filename)) return;
 

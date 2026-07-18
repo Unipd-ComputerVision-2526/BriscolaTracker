@@ -40,14 +40,6 @@ class TemplateCoinMatcher
         bool match(const cv::Mat& img, const cv::Mat& mask, std::pair<Suit, int>& card);
 
         /**
-         * @brief Counts the number of circles in the image using Hough transform.
-         * @param img The input image.
-         * @param mask The corresponding mask.
-         * @return The number of detected circles.
-         */
-        int circleCounter(const cv::Mat& img, const cv::Mat& mask);
-
-        /**
          * @brief Calculates the aspect ratio for a given set of four rectangles.
          * @param rects A vector of four rectangles.
          * @return The calculated aspect ratio.

@@ -6,7 +6,7 @@
  */
 
 #include "gameManager.h"
-#include "video_manager.h"
+#include "videoFrameManager.h"
 #include <iostream>
 #include <map>
 #include <stdexcept>
@@ -37,7 +37,7 @@ GameManager::~GameManager() = default;
 // PUBLIC METHODS
 // ============================================================================
 
-GameMetrics GameManager::processFullGame(const std::string& gameName, const std::string& baseFolderPath, bool showDetailedStats) {
+GameMetrics GameManager::processFullGame(const std::string& gameName, const std::string& datasetFolderPath, const std::string& resultsFolderPath, bool showDetailedStats){
     std::cout << "\n========================================" << std::endl;
     std::cout << " STARTING ANALYSIS: " << gameName << std::endl;
     std::cout << "========================================" << std::endl;
@@ -49,11 +49,11 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
     reporter.clear();
 
     // Identify the Briscola card before processing rounds to configure the game engine's trump suit
-    identifyBriscola(gameName, baseFolderPath);
+    identifyBriscola(gameName, datasetFolderPath);
 
     // Process all 20 rounds of a standard Briscola match
     for (int r = 1; r <= 20; ++r) {
-        std::string videoPath = buildRoundVideoPath(baseFolderPath, gameName, r);
+        std::string videoPath = buildRoundVideoPath(datasetFolderPath, gameName, r);
 
         // Plays and evaluates the round
         playSingleRound(r, videoPath, gameName);
@@ -61,18 +61,18 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
 
     // Export data round to csv
     
-    std::string outCsvPath = baseFolderPath + gameName + "_output.csv";
+    std::string outCsvPath = resultsFolderPath + gameName + "Output.csv";
     reporter.exportCSV(outCsvPath);
     std::cout << ">>> Exported tracker results to: " << outCsvPath << std::endl;
 
     // Computes and prints final metrics by comparing them to the ground truth
-    std::string gtPath = baseFolderPath + gameName + "_results.csv";
+    std::string gtPath = datasetFolderPath + gameName + "Results.csv";
     // Since the ground truth data provided have different names and have been 
     // corrected, we added multiple options to dynamically find the right file.
     std::vector<std::string> possibleCorrectedNames = {
-        baseFolderPath + gameName + "_results_corrected.csv", // Ideal format
-        baseFolderPath + gameName + "resultsCORRECTED.csv",   // Legacy format (no underscore)
-        baseFolderPath + gameName + "resultsCORRECTED 2.csv"  // Legacy format (with space)
+        datasetFolderPath + gameName + "_results_corrected.csv", // Ideal format
+        datasetFolderPath + gameName + "resultsCORRECTED.csv",   // Legacy format (no underscore)
+        datasetFolderPath + gameName + "resultsCORRECTED 2.csv"  // Legacy format (with space)
     };
 
     for (const std::string& checkPath : possibleCorrectedNames) {
@@ -271,7 +271,7 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             }
 
             // Decide the active player based on the majority of votes
-            int myIdx = (northVotes >= southVotes) ? 0 : 1;
+            int myIdx = (watcher->wasNordActive()) ? 0 : 1;
             
             int otherIdx = 1 - myIdx; 
             Card card{recognizedCard.first, recognizedCard.second};
@@ -303,30 +303,14 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             if (!leaderKnown) { 
                 Player visualLeader = static_cast<Player>(myIdx);
 
-                if (isFirstRound) {
-                    leader = visualLeader;
-                } else {
-                    if (visualLeader == previousWinner) {
-                        leader = visualLeader; 
-                    } else {
-                        std::cout << ">>> WARNING: Leader mismatch! Video: " 
-                                  << playerIdxToName(static_cast<int>(visualLeader)) 
-                                  << " | Rules: " 
-                                  << playerIdxToName(static_cast<int>(previousWinner)) << std::endl;
-                        
-                        int voteDifference = std::abs(northVotes - southVotes);
-                        
-                        if (voteDifference < 3) {
-                            std::cout << "    -> Uncertain motion (diff: " << voteDifference 
-                                      << "). Using rules to avoid false positives." << std::endl;
-                            leader = previousWinner;
-                        } else {
-                            std::cout << "    -> Clear motion (diff: " << voteDifference 
-                                      << "). Using video to prevent error propagation." << std::endl;
-                            leader = visualLeader;
-                        }
-                    }
+                if (visualLeader != previousWinner) {
+                    std::cout << ">>> WARNING: Leader mismatch! Video: " 
+                                << playerIdxToName(static_cast<int>(visualLeader)) 
+                                << " | Rules: " 
+                                << playerIdxToName(static_cast<int>(previousWinner)) << std::endl;
+
                 }
+                leader = visualLeader;
                 leaderKnown = true; 
             }
             
@@ -388,6 +372,7 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
         } catch (const std::exception& e) {
              std::cerr << ">>> ERROR: Fallback failed: " << e.what() << std::endl;
         }
+    }
 }
 
 void GameManager::recordRoundResults(int roundNumber, const Card playedCards[2], const RoundResult& result) {

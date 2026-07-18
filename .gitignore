@@ -47,6 +47,9 @@ build-*/
 # Dataset directories
 dataset/
 
+# Result directories
+results/
+
 # VSCODE directories
 /.vscode
 

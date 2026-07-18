@@ -64,7 +64,8 @@ int main(int argc, char* argv[]) {
     }
 
     const std::string datasetPath = "../dataset/Briscola_Trentine";
-    const std::string baseFolderPath = "../dataset/";
+    const std::string datasetFolderPath = "../dataset/";
+    const std::string resultsFolderPath = "../results/";
 
     std::vector<std::tuple<cv::Mat, Suit, int>> dataset = loadDataset(datasetPath);
     if (dataset.empty()) {
@@ -87,13 +88,13 @@ int main(int argc, char* argv[]) {
     int g = 1;
     while (true) {
         std::string gameName = "game" + std::to_string(g);
-        std::string expectedPath = baseFolderPath + gameName;
+        std::string expectedPath = datasetFolderPath + gameName;
 
         if (!std::filesystem::exists(expectedPath) || !std::filesystem::is_directory(expectedPath)) {
             break; 
         }
 
-        GameMetrics gm = manager.processFullGame(gameName, baseFolderPath, showDetailedStats);
+        GameMetrics gm = manager.processFullGame(gameName, datasetFolderPath, resultsFolderPath,showDetailedStats);
         totalMetrics.add(gm);
         
         g++; 

@@ -46,7 +46,7 @@ public:
      * @param showDetailedStats If true, prints detailed suit stats after the game.
      * @return GameMetrics containing the results of the evaluation against ground truth.
      */
-    GameMetrics processFullGame(const std::string& gameName, const std::string& baseFolderPath, bool showDetailedStats = false);
+    GameMetrics processFullGame(const std::string& gameName, const std::string& datasetFolderPath, const std::string& resultsFolderPath, bool showDetailedStats = false);
 
 private:
     Eye* watcher;                         ///< Pointer to the shared computer vision system (not owned).
