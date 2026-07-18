@@ -22,11 +22,5 @@ add_executable(${PROJECT_NAME}
     src/templateCoinMatcher.cpp
     )
 
-#add_executable(test_refactoring
-#    main_test.cpp
-#    src/utils.cpp
-#    src/video_manager.cpp
-#    )
-
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
 #target_link_libraries(test_refactoring ${OpenCV_LIBS})

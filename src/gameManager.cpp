@@ -38,9 +38,7 @@ GameManager::~GameManager() = default;
 // ============================================================================
 
 GameMetrics GameManager::processFullGame(const std::string& gameName, const std::string& datasetFolderPath, const std::string& resultsFolderPath, bool showDetailedStats){
-    std::cout << "\n========================================" << std::endl;
-    std::cout << " STARTING ANALYSIS: " << gameName << std::endl;
-    std::cout << "========================================" << std::endl;
+    reporter.printGameStart(gameName);
  
     // Reset internal state, engine, and reporting history from any previously analyzed games
     isBriscolaIdentified = false;
@@ -59,14 +57,15 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
         playSingleRound(r, videoPath, gameName);
     }
 
+    reporter.generateFinalReport(gameName);
+
+
     // Export data round to csv
-    
-    std::string outCsvPath = resultsFolderPath + gameName + "Output.csv";
+    std::string outCsvPath = resultsFolderPath + gameName + "output.csv";
     reporter.exportCSV(outCsvPath);
-    std::cout << ">>> Exported tracker results to: " << outCsvPath << std::endl;
 
     // Computes and prints final metrics by comparing them to the ground truth
-    std::string gtPath = datasetFolderPath + gameName + "Results.csv";
+    std::string gtPath = datasetFolderPath + gameName + "results.csv";
     // Since the ground truth data provided have different names and have been 
     // corrected, we added multiple options to dynamically find the right file.
     std::vector<std::string> possibleCorrectedNames = {
@@ -82,7 +81,7 @@ GameMetrics GameManager::processFullGame(const std::string& gameName, const std:
         }
     }
     
-    std::cout << "\n>>> END OF ANALYSIS for " << gameName << ". Final Results:" << std::endl;
+    reporter.printGameEnd(gameName);
     return reporter.calculateMetrics(gtPath, showDetailedStats);
 }
 
@@ -147,7 +146,7 @@ void GameManager::identifyBriscola(const std::string& gameName, const std::strin
         VideoFrameManager vfm(videoPath, 1);
  
         if (!vfm.isOpened()) {
-            std::cerr << ">>> Warning: Cannot open video for Briscola identification: " << videoPath << std::endl;
+            reporter.printError(">>> Warning: Cannot open video for Briscola identification: "+videoPath);
             continue; 
         }
  
@@ -163,7 +162,7 @@ void GameManager::identifyBriscola(const std::string& gameName, const std::strin
                 cardFrequencies[recognizedCard]++;
             }
         } else {
-            std::cerr << ">>> Warning: Could not extract frame for video: " << videoPath << std::endl;
+            reporter.printError(">>> Warning: Could not extract frame for video: " + videoPath);
         }
     }
  
@@ -200,19 +199,19 @@ void GameManager::identifyBriscola(const std::string& gameName, const std::strin
         currentBriscolaCard.suit = bestCard.first;  
         currentBriscolaCard.number = bestCard.second;
         isBriscolaIdentified = true;
-        std::cout << ">>> Briscola fully identified: " << bestCard.second << " of " << bestCard.first << std::endl;
+        reporter.printBriscolaIdentified(bestCard.second,bestCard.first);
     } 
     else if (maxSuitFreq > 0) {
         currentBriscolaCard.suit = bestSuit;
         currentBriscolaCard.number = (std::rand() % 10) + 1; // Random number, correct suit
         isBriscolaIdentified = false;
-        std::cout << ">>> Briscola SUIT identified: " << bestSuit << " (Number guessed randomly)" << std::endl;
+        reporter.printBriscolaSuitIdentified(bestSuit);
     } 
     else {
         currentBriscolaCard.suit = static_cast<Suit>((std::rand() % 4) + 1);
         currentBriscolaCard.number = (std::rand() % 10) + 1;
         isBriscolaIdentified = false;
-        std::cout << ">>> ERROR: Could not identify Briscola. Generating totally random card." << std::endl;
+        reporter.printError(">>> WARNING: Could not identify Briscola. Generating totally random card.");
     }
 
     gameEngine = std::make_unique<Briscola>(currentBriscolaCard.suit, 2);
@@ -223,8 +222,9 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
     // Initialize VideoFrameManager with motion-based selection to skip static frames
     VideoFrameManager vfm(videoPath);
     if (!vfm.isOpened()) {
-        std::cerr << ">>> ERROR: Cannot open video for round"
-                << roundNumber << " to path: " << videoPath << std::endl;
+        std::string err=">>> ERROR: Cannot open video for round "+roundNumber;
+                    err+=" to path: "+videoPath;
+        reporter.printError(err);
         return;
     }
 
@@ -249,7 +249,7 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
     bool leaderKnown = false;
     Player leader = Player::North;
 
-    std::cout << "\n--- Round " << roundNumber << " ---" << std::endl;
+    reporter.printRoundStart(roundNumber);
 
     while (vfm.getNextInterestingFrame(frame)) {
         if (watcher->recognize(frame, recognizedCard)) {
@@ -259,15 +259,6 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             // Ignore the static Briscola on the table until it is actually drawn
             if (isTheStaticBriscola && !briscolaPickedUp) {
                 continue;
-            }
-
-            // Determine player indices and perform the check over X consecutive frames to filter out tracking noise
-            int northVotes = 0;
-            int southVotes = 0;
-
-            for(int i = 0; i < 5; ++i) {
-                if(watcher->wasNordActive()) northVotes++;
-                else southVotes++;
             }
 
             // Decide the active player based on the majority of votes
@@ -304,18 +295,16 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
                 Player visualLeader = static_cast<Player>(myIdx);
 
                 if (visualLeader != previousWinner) {
-                    std::cout << ">>> WARNING: Leader mismatch! Video: " 
-                                << playerIdxToName(static_cast<int>(visualLeader)) 
-                                << " | Rules: " 
-                                << playerIdxToName(static_cast<int>(previousWinner)) << std::endl;
+                    std::string err=">>> WARNING: Leader mismatch! Video: " + playerIdxToName(static_cast<int>(visualLeader));
+                                err+= " | Rules: " + playerIdxToName(static_cast<int>(previousWinner));
+                    reporter.printError(err);
 
                 }
                 leader = visualLeader;
                 leaderKnown = true; 
             }
             
-            std::cout << "Recognized " << playerIdxToName(myIdx) << " card: " 
-                      << card.number << " of " << card.suit << std::endl;
+            reporter.printCardRecognized(playerIdxToName(myIdx),card.number,card.suit);
 
             // Stop processing once both cards are found
             if (found[0] && found[1]) break;
@@ -334,11 +323,16 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             recordRoundResults(roundNumber, playedCards, result);
 
         } catch (const std::exception& e) {
-            std::cerr << ">>> ERROR: Round " << roundNumber
-                      << " could not be resolved (" << e.what() << "). Skipping." << std::endl;
+            std::string err=  ">>> ERROR: Round " +roundNumber;
+                        err+= " could not be resolved (";
+                        err+= e.what();
+                        err+= "). Skipping.";
+            reporter.printError(err);
         }
     } else {
-        std::cout << ">>> ERROR: Round " << roundNumber << " incomplete. Applying fallback." << std::endl;
+        std::string err= ">>> ERROR: Round " + roundNumber;
+                    err+= " incomplete. Applying fallback.";
+        reporter.printError(err);
         
         // Assign a non-trump suit to the placeholder to avoid unintended point manipulation
         Suit dummySuit = (currentBriscolaCard.suit == Suit::COINS) ? Suit::CUPS : Suit::COINS;
@@ -370,7 +364,9 @@ void GameManager::playSingleRound(int roundNumber, const std::string& videoPath,
             recordRoundResults(roundNumber, playedCards, result);
             
         } catch (const std::exception& e) {
-             std::cerr << ">>> ERROR: Fallback failed: " << e.what() << std::endl;
+            std::string err=">>> ERROR: Fallback failed: ";
+                        err+=  + e.what();
+            reporter.printError(err);
         }
     }
 }
@@ -394,8 +390,7 @@ void GameManager::recordRoundResults(int roundNumber, const Card playedCards[2],
     // Sends the structured data to the reporter
     reporter.logRound(data);
     
-    std::cout << "Round " << roundNumber << " FINISHED. Leader: " << data.leader
-              << ". Winner: " << data.winner << " (" << data.points << " pts)" << std::endl;
+    reporter.printRoundFinished(roundNumber,data.leader,data.winner,data.points);
 }
  
 

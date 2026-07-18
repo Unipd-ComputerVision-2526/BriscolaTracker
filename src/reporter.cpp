@@ -79,11 +79,12 @@ void Reporter::exportCSV(const std::string& filename) const {
              << r.leader << "," << r.winner << "," << r.points << "\n";
     }
     file.close();
+
+    std::cout << ">>> Exported tracker results to: " << filename << std::endl;
+
 }
 
-void Reporter::generateFinalReport(const std::string& filename) const {
-    std::ofstream file(filename);
-    if (!checkStream(file, filename)) return;
+void Reporter::generateFinalReport(const std::string& gameName) const {
 
     int totalNorth = 0, totalSouth = 0;
     for (const auto& r : history_) {
@@ -91,35 +92,15 @@ void Reporter::generateFinalReport(const std::string& filename) const {
         else if (r.winner == "South") totalSouth += r.points;
     }
 
-    file << "====================================================\n";
-    file << "           BRISCOLA TRACKER - FINAL REPORT          \n";
-    file << "====================================================\n\n";
+    std::cout << "====================================================\n";
+    std::cout << "           BRISCOLA TRACKER - Game "<<gameName<<"                \n";
+    std::cout << "====================================================\n";
+    std::cout << "GAME SUMMARY\n";
+    std::cout << "Total Points North: " << totalNorth << "\n";
+    std::cout << "Total Points South: " << totalSouth << "\n";
+    std::cout << "WINNER: " << (totalNorth > totalSouth ? "NORTH" : (totalSouth > totalNorth ? "SOUTH" : "DRAW")) << "\n";
+    std::cout << "====================================================\n";
 
-    file << std::left << std::setw(8)  << "Round" 
-         << std::setw(18) << "North Card" 
-         << std::setw(18) << "South Card" 
-         << std::setw(10) << "Winner" 
-         << "Points\n";
-    file << std::string(60, '-') << "\n";
-
-    for (const RoundData& r : history_) {
-        std::string nCard = std::to_string(r.northNumber) + " " + suitToString(r.northSuit);
-        std::string sCard = std::to_string(r.southNumber) + " " + suitToString(r.southSuit);
-        file << std::left << std::setw(8)  << r.round 
-             << std::setw(18) << nCard 
-             << std::setw(18) << sCard 
-             << std::setw(10) << r.winner 
-             << r.points << "\n";
-    }
-
-    file << "\n" << std::string(60, '=') << "\n";
-    file << "GAME SUMMARY\n";
-    file << "Total Points North: " << totalNorth << "\n";
-    file << "Total Points South: " << totalSouth << "\n";
-    file << "WINNER: " << (totalNorth > totalSouth ? "NORTH" : (totalSouth > totalNorth ? "SOUTH" : "DRAW")) << "\n";
-    file << "====================================================\n";
-
-    file.close();
 }
 
 std::vector<RoundData> Reporter::parseGroundTruth(std::ifstream& file) const {
@@ -304,10 +285,13 @@ void Reporter::printGameEnd(const std::string& gameName) const {
     std::cout << "\n>>> END OF ANALYSIS for " << gameName << ". Final Results:" << std::endl;
 }
 
-void Reporter::printBriscolaIdentified(int number, Suit suit, int maxFreq) const {
+void Reporter::printBriscolaIdentified(int number, Suit suit) const {
     std::cout << ">>> Briscola correctly identified: "
-              << number << " of " << suitToString(suit)
-              << " (seen in " << maxFreq << " frames across first 3 rounds)" << std::endl;
+              << number << " of " << suitToString(suit) << std::endl;
+}
+
+void Reporter::printBriscolaSuitIdentified(Suit suit) const {
+    std::cout << ">>> Briscola SUIT identified: " << suit << " (Number guessed randomly)" << std::endl;
 }
 
 void Reporter::printRoundStart(int roundNumber) const {

@@ -309,6 +309,7 @@ void Eye::processMask(const cv::Mat& img, const cv::Mat& mask, cv::Mat& dst)
 
     cv::erode(dst,dst,kernel_3);
     cv::dilate(dst,dst,kernel_5);
+    cv::morphologyEx(dst,dst,cv::MORPH_CLOSE,kernel_5);
 }
 
 void Eye::accumulateMotion(const cv::Mat& diffMask, bool flush)

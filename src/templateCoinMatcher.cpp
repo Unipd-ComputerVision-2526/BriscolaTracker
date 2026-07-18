@@ -91,14 +91,12 @@ bool TemplateCoinMatcher::match(const cv::Mat& img, const cv::Mat& mask, std::pa
         double r = calculateAspectRatios(coinRects);
         if (std::abs(r - expectedRatio6_) < std::abs(r - expectedRatio4_)) {
             coin = 6;
-            std::cout<<"CARD FOUND VIA TEMPLATE FALLBACK: 6 OF COINS (reconstructed from ratio "<< r <<")"<<std::endl;
         }
     }
     
     if (coin >= 2 && coin <= 7) {
         card = {Suit::COINS, coin};
         if (coin != 6 || coinRects.size() != 4) {
-            std::cout<<"CARD FOUND VIA TEMPLATE FALLBACK: " << coin << " OF COINS"<<std::endl;
         }
         return true;
     }

@@ -39,14 +39,6 @@
 *.out
 *.app
 
-# Build directories
-build/
-Build/
-build-*/
-
-# Dataset directories
-dataset/
-
 # Result directories
 results/
 

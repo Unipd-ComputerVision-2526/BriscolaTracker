@@ -79,7 +79,7 @@ struct GameMetrics {
     /** @brief Total expected card comparisons. */
     int expectedCards = 0;
     /** @brief Briscola evaluation denominator. */
-    int expectedBriscola = 1; 
+    int expectedBriscola = 0; 
     /** @brief Player accuracy denominator accumulator used during metric computation. */
     int totalPlayers = 0;
     /** @brief Number of correct game result fields. */
@@ -156,7 +156,10 @@ public:
     void printGameEnd(const std::string& gameName) const;
 
     /** @brief Prints the successfully identified Briscola to console. */
-    void printBriscolaIdentified(int number, Suit suit, int maxFreq) const;
+    void printBriscolaIdentified(int number, Suit suit) const;
+
+    /** @brief Prints the successfully identified Briscola Suit to console. */
+    void printBriscolaSuitIdentified(Suit suit) const;
 
     /** @brief Prints the round start message to console. */
     void printRoundStart(int roundNumber) const;
